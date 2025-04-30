@@ -1,19 +1,22 @@
 # PbnPy: Python Paint-By-Number Generator
 
-**PbnPy** is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates a color swatch legend for reference.
+**PbnPy** is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
 
 ## Features
-- Supports style preprocessing (e.g. blur, pixelate, mosaic)
-- Complexity presets for beginner to master-level outputs
-- Tiled labeling for paintability (not just centroids)
+
+- Converts any image into paint-by-number format
+- Style preprocessing: `blur`, `pixelate`, `mosaic`
+- Complexity presets for beginner to master-level detail
+- Label placement modes: `diagonal`, `centroid`, `stable`
 - Custom font support for overlays and legend
-- Outputs:
-  - Quantized image
-  - Labeled image
-  - Palette legend
+- Vector (SVG) and raster (PNG) output
+- Optional fixed-palette matching from a source image
+- Fully command-line driven with rich configuration
 
 ## Installation
+
 Requires Python 3.7+
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -27,37 +30,65 @@ Dependencies:
 - `scikit-image`
 
 ## Usage
+
+### Quick Start
+
 ```bash
-python -m pbn generate input.jpg --output-dir ./out \
+python pbn.py input.jpg --output-dir out
+```
+This uses the intermediate complexity preset and default KMeans color quantization.
+
+### Full Example
+```bash
+python pbn.py input.jpg --output-dir ./out \
   --complexity intermediate \
   --style pixelate \
-  --font ./fonts/DejaVuSansMono.ttf
+  --label-mode diagonal \
+  --font ./fonts/DejaVuSansMono.ttf \
+  --palette-from swatches.jpg \
+  --yes
 ```
 
-### Example Output:
+### Output Files
+
 - `out/quantized.png` — color-reduced version of the input
-- `out/labeled.png` — indexed paint-by-number with repeated digits
-- `out/legend.png` — legend bar with palette swatches and numbers
+- `out/labeled.png` — raster image with labeled regions
+- `out/vector.svg` — vectorized paint-by-number guide
+- `out/legend.png` — swatch legend with corresponding numbers
+
+## Options
+
+| Flag             | Description                                                                 |
+|------------------|-----------------------------------------------------------------------------|
+| `--complexity`   | Preset detail level: `beginner`, `intermediate`, `master`                  |
+| `--style`        | Preprocessing style: `blur`, `pixelate`, `mosaic`                          |
+| `--label-mode`   | Label placement strategy: `diagonal` (default), `centroid`, `stable`       |
+| `--num-colors`   | Manually set number of colors (overrides preset)                           |
+| `--palette-from` | Use an external image as a fixed palette source                            |
+| `--font`         | Path to a `.ttf` font file                                                  |
+| `--font-size`    | Font size for region labels                                                 |
+| `--tile-spacing` | Distance between repeated labels within a region                           |
+| `--swatch-size`  | Width/height of each swatch in the legend                                  |
+| `--legend-height`| Height of the swatch legend image                                           |
+| `--skip-legend`  | Skip generation of the legend image                                         |
+| `--yes` / `-y`   | Overwrite existing output files without prompting                          |
 
 ## Complexity Presets
-| Name        | Colors | Tile Spacing | Font Size |
-|-------------|--------|---------------|------------|
-| `beginner`  | 6      | 40px          | 14         |
+
+| Name         | Colors | Tile Spacing | Font Size |
+|--------------|--------|---------------|------------|
+| `beginner`   | 6      | 40px          | 14         |
 | `intermediate` | 12   | 30px          | 12         |
-| `master`    | 24     | 20px          | 10         |
+| `master`     | 24     | 20px          | 10         |
 
 ## Style Options
-| Name       | Description                                 |
-|------------|---------------------------------------------|
-| `blur`     | Gaussian blur before quantizing             |
-| `pixelate` | Chunky low-res pixelation                   |
-| `mosaic`   | Mosaic effect with smoother blending        |
 
-## Roadmap
-- Vector/SVG export
-- Paint-tray palette matching (`--palette-from`)
-- Printable layout generator
-- Artistic modes (`--style impressionist`, etc.)
+| Name       | Description                              |
+|------------|------------------------------------------|
+| `blur`     | Applies a Gaussian blur                  |
+| `pixelate` | Chunky low-resolution pixelation         |
+| `mosaic`   | Pixelate and upscale for blended effect  |
 
 ## License
+
 MIT

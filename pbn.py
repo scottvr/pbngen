@@ -20,6 +20,7 @@ def generate(
     palette_from: str = typer.Option(None, help="Path to image to extract fixed palette from."),
     font_path: str = typer.Option(None, help="Path to a .ttf font file."),
     font_size: int = typer.Option(None, help="Font size for overlay labels."),
+    label_mode: str = typer.Option("diagonal", help="Label placement mode: diagonal, centroid, stable."),
     tile_spacing: int = typer.Option(None, help="Distance between repeated numbers in a region."),
     swatch_size: int = typer.Option(40, help="Width/height of each color swatch in the legend."),
     legend_height: int = typer.Option(80, help="Height in pixels of the palette legend image."),

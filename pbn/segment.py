@@ -183,8 +183,6 @@ def segment_and_label(input_path, palette, font_path=None, font_size=None,
 
     return output
 
-    import numpy as np
-
 def interpolate_contour(contour, step=0.5):
     """Given a list of float (y, x) contour points, return a densified list of (x, y) points."""
     dense_points = []
