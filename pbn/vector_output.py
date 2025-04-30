@@ -1,36 +1,57 @@
 import svgwrite
-from typing import List, Tuple
+from typing import Tuple
+from .segment import collect_region_primitives
 
-def write_svg(primitives: List[dict], output_path: str, canvas_size: Tuple[int, int]):
+def write_svg(
+    output_path: str,
+    canvas_size: Tuple[int, int],
+    primitives
+):
     """
-    Render collected drawing primitives into an SVG file.
-
-    Args:
-        primitives (List[dict]): Drawing instructions with outlines and label positions.
-        output_path (str): Path to save the SVG file.
-        canvas_size (Tuple[int, int]): (width, height) of the SVG canvas.
+    Render collected drawing primitives into an SVG file with optional debugging.
     """
-    dwg = svgwrite.Drawing(output_path, size=(canvas_size[0], canvas_size[1]))
-    # Auto scale stroke width for visibility
-    max_dim = max(canvas_size)
-    stroke_width = max(0.5, int(max_dim / 512))  # tweak factor as needed
+    width, height = canvas_size
+    dwg = svgwrite.Drawing(output_path, size=(width, height))
 
+    # Optional debug box to visualize canvas bounds
+    dwg.add(dwg.rect(insert=(0, 0), size=canvas_size, fill='white', stroke='gray', stroke_width=1))
 
     for item in primitives:
-        color = svgwrite.rgb(*item["color"])
+#        try:
+#            color = svgwrite.rgb(*item["color"])
+#        except Exception as e:
+#            raise ValueError(f"Invalid color value in primitive: {item['color']}") from e
+        color = "#66ccff"  # fixed light blue for PBN outlines and labels
 
-        # Draw outline as polyline
-        if item["outline"]:
-#            dwg.add(dwg.polyline(points=item["outline"], stroke=color, fill="none", stroke_width=1))
-            dwg.add(dwg.polyline(points=item["outline"], stroke=color, fill="none", stroke_width=stroke_width))
 
+        # Draw outline
+        if item.get("outline"):
+            # Filter out-of-bounds coords
+            outline = []
+            for x, y in item["outline"]:
+                if 0 <= x < width and 0 <= y < height:
+                    outline.append((int(x), int(y)))
+                else:
+                    print(f"⚠️ Outline point ({x},{y}) out of bounds")
 
-        # Add numeric labels
-        for label in item["labels"]:
+            if outline:
+                dwg.add(dwg.polyline(
+                    points=outline,
+                    stroke=color,
+                    fill="none",
+                    stroke_width=1
+                ))
+
+        # Draw text labels
+        for label in item.get("labels", []):
             x, y = label["position"]
+            if not (0 <= x < width and 0 <= y < height):
+                print(f"⚠️ Label '{label['value']}' at ({x},{y}) is out of bounds")
+                continue
+
             dwg.add(dwg.text(
                 label["value"],
-                insert=(x, y),
+                insert=(int(x), int(y)),
                 fill=color,
                 font_size=label["font_size"],
                 text_anchor="middle",
