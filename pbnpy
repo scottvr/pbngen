@@ -1,0 +1,84 @@
+import typer
+from pbn import quantize, segment, legend, stylize, palette_tools
+import os
+from pathlib import Path
+
+app = typer.Typer(help="Paint-by-number generator: quantize, segment, label, and output annotated image + palette legend.")
+
+@app.command()
+def generate(
+    input_path: str = typer.Argument(..., help="Input image file."),
+    output_dir: str = typer.Option("./output", help="Directory to save output files."),
+    complexity: str = typer.Option(None, help="Preset complexity level: beginner, intermediate, master."),
+    style: str = typer.Option(None, help="Optional style to apply before quantization: blur, mosaic, pixelate."),
+    num_colors: int = typer.Option(None, help="Number of colors in quantized output."),
+    palette_from: str = typer.Option(None, help="Path to image to extract fixed palette from."),
+    font_path: str = typer.Option(None, help="Path to a .ttf font file."),
+    font_size: int = typer.Option(None, help="Font size for overlay labels."),
+    tile_spacing: int = typer.Option(None, help="Distance between repeated numbers in a region."),
+    swatch_size: int = typer.Option(40, help="Width/height of each color swatch in the legend."),
+    legend_height: int = typer.Option(80, help="Height in pixels of the palette legend image."),
+    skip_legend: bool = typer.Option(False, help="If set, skips generating the palette legend.")
+):
+    """
+    Full PBN pipeline: optional style, then quantize, segment, label, and legend.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    presets = {
+        "beginner": dict(num_colors=6, tile_spacing=40, font_size=14),
+        "intermediate": dict(num_colors=12, tile_spacing=30, font_size=12),
+        "master": dict(num_colors=24, tile_spacing=20, font_size=10),
+    }
+    if complexity in presets:
+        preset = presets[complexity]
+        num_colors = num_colors or preset["num_colors"]
+        tile_spacing = tile_spacing or preset["tile_spacing"]
+        font_size = font_size or preset["font_size"]
+
+    num_colors = num_colors or 12
+    tile_spacing = tile_spacing or 30
+    font_size = font_size or 12
+
+    styled_path = str(Path(output_dir) / "styled.png")
+    quantized_path = str(Path(output_dir) / "quantized.png")
+    labeled_path = str(Path(output_dir) / "labeled.png")
+    legend_path = str(Path(output_dir) / "legend.png")
+
+    input_to_use = input_path
+    if style:
+        input_to_use = styled_path
+        stylize.apply_style(input_path, styled_path, style)
+        typer.echo(f"Applied style '{style}' and saved to: {styled_path}")
+
+    fixed_palette = None
+    if palette_from:
+        fixed_palette = palette_tools.extract_palette_from_image(palette_from, max_colors=num_colors)
+        typer.echo(f"Extracted palette from '{palette_from}' with up to {num_colors} colors.")
+
+    palette = quantize.quantize_image(input_to_use, quantized_path, num_colors=num_colors, fixed_palette=fixed_palette)
+    typer.echo(f"Saved quantized image to: {quantized_path}")
+
+    labeled_img = segment.segment_and_label(
+        input_path=quantized_path,
+        palette=palette,
+        font_path=font_path,
+        font_size=font_size,
+        tile_spacing=tile_spacing
+    )
+    labeled_img.save(labeled_path)
+    typer.echo(f"Saved labeled image to: {labeled_path}")
+
+    if not skip_legend:
+        legend.generate_legend(
+            palette=palette,
+            output_path=legend_path,
+            font_path=font_path,
+            font_size=font_size,
+            swatch_size=swatch_size,
+            padding=10
+        )
+        typer.echo(f"Saved palette legend to: {legend_path}")
+
+if __name__ == "__main__":
+    app()
