@@ -34,13 +34,13 @@ Dependencies:
 ### Quick Start
 
 ```bash
-python pbn.py input.jpg --output-dir out
+python pbnpy input.jpg --output-dir out
 ```
 This uses the intermediate complexity preset and default KMeans color quantization.
 
 ### Full Example
 ```bash
-python pbn.py input.jpg --output-dir ./out \
+python pbnpy input.jpg --output-dir ./out \
   --complexity intermediate \
   --style pixelate \
   --label-mode diagonal \
