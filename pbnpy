@@ -1,7 +1,8 @@
 import typer
-from pbn import quantize, segment, legend, stylize, palette_tools
+from pbn import quantize, segment, legend, stylize, palette_tools, vector_output
 import os
 from pathlib import Path
+from PIL import Image
 
 app = typer.Typer(help="Paint-by-number generator: quantize, segment, label, and output annotated image + palette legend.")
 
@@ -18,7 +19,8 @@ def generate(
     tile_spacing: int = typer.Option(None, help="Distance between repeated numbers in a region."),
     swatch_size: int = typer.Option(40, help="Width/height of each color swatch in the legend."),
     legend_height: int = typer.Option(80, help="Height in pixels of the palette legend image."),
-    skip_legend: bool = typer.Option(False, help="If set, skips generating the palette legend.")
+    skip_legend: bool = typer.Option(False, help="If set, skips generating the palette legend."),
+    vector_output_path: str = typer.Option(None, help="Optional SVG file path to write vector version of labeled output.")
 ):
     """
     Full PBN pipeline: optional style, then quantize, segment, label, and legend.
@@ -59,15 +61,27 @@ def generate(
     palette = quantize.quantize_image(input_to_use, quantized_path, num_colors=num_colors, fixed_palette=fixed_palette)
     typer.echo(f"Saved quantized image to: {quantized_path}")
 
-    labeled_img = segment.segment_and_label(
-        input_path=quantized_path,
-        palette=palette,
-        font_path=font_path,
-        font_size=font_size,
-        tile_spacing=tile_spacing
-    )
-    labeled_img.save(labeled_path)
-    typer.echo(f"Saved labeled image to: {labeled_path}")
+    if vector_output_path:
+        primitives = segment.collect_region_primitives(
+            input_path=quantized_path,
+            palette=palette,
+            font_path=font_path,
+            font_size=font_size,
+            tile_spacing=tile_spacing
+        )
+        image = Image.open(quantized_path)
+        vector_output.write_svg(primitives, output_path=vector_output_path, canvas_size=image.size)
+        typer.echo(f"Saved vector-labeled output to: {vector_output_path}")
+    else:
+        labeled_img = segment.segment_and_label(
+            input_path=quantized_path,
+            palette=palette,
+            font_path=font_path,
+            font_size=font_size,
+            tile_spacing=tile_spacing
+        )
+        labeled_img.save(labeled_path)
+        typer.echo(f"Saved labeled image to: {labeled_path}")
 
     if not skip_legend:
         legend.generate_legend(
