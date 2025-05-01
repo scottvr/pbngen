@@ -139,6 +139,36 @@ J -->|"Label Pos (x, y)"| G2
 
 The `blobbify` branch has the early stages of getting more painterly output and end results if that sort of thing interests you.
 
+### Description
+
+When `--blobbify` is used, contiguous color regions are post-segmentation subdivided into smaller, organically shaped blobs. These simulate human brushstroke behavior and allow finer painterly texture in the paint-by-number output. The blob count is dynamically derived from region area and the specified min/max blob area.
+
+Blobs too small to accommodate the specified `--min-label-font` will be merged with the smallest adjacent (but > blob-min mm^2 blob in area) blob for legibility.
+
+### Flags
+
+| Flag                | Description                                                                 |
+|---------------------|-----------------------------------------------------------------------------|
+| `--blobbify`        | Enable painterly splitting of color regions into brush-stroke-like blobs     |
+| `--blob-min`        | Minimum blob area in mm² (default: 3)                                       |
+| `--blob-max`        | Maximum blob area in mm² (default: 30)                                      |
+| `--min-label-font`  | Minimum font size required for a blob to receive a label (default: 8)       |
+| `--dpi`             | for painterly operations, we'll use print size. By default the source image dpi is used, but can be overridden with this flag.|
+### Example
+
+```bash
+python pbnpy.py input.jpg \
+  --output-dir ./out \
+  --blobbify \
+  --blob-min 5 \
+  --blob-max 20 \
+  --min-label-font 10 \
+  --font ./fonts/DejaVuSansMono.ttf \
+  --yes
+```
+
+This example generates painterly blobs within each color region with sizes between 5–20 mm² and skips any that cannot fit a size 10 font label.
+
 
 ## License
 
