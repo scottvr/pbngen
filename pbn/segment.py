@@ -4,27 +4,52 @@ from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
 
+def make_label(x, y, value, font_size):
+    label = {
+        "position": (x, y),
+        "value": str(value),
+        "font_size": font_size
+    }
+    return label
 
 def find_stable_label_pixel(region_mask):
-    """Find the most surrounded pixel in a binary region mask."""
+    """
+    Find the most 'stable' label location within a binary region.
+    A stable location is one that is most deeply surrounded by the same value
+    in all four cardinal directions. Hat tip to Dan Munro for his pbnify JS that inspired this.
+
+    Args:
+        region_mask (np.ndarray): Binary 2D array where 1=region, 0=outside
+
+    Returns:
+        (int, int): (x, y) coordinate of the most stable pixel
+    """
     h, w = region_mask.shape
     best_score = -1
-    best_pixel = (0, 0)
+    best_coord = (0, 0)
 
-    for y in range(1, h - 1):
-        for x in range(1, w - 1):
-            if region_mask[y, x] == 0:
-                continue
-            up = down = left = right = 0
-            while y - up - 1 >= 0 and region_mask[y - up - 1, x]: up += 1
-            while y + down + 1 < h and region_mask[y + down + 1, x]: down += 1
-            while x - left - 1 >= 0 and region_mask[y, x - left - 1]: left += 1
-            while x + right + 1 < w and region_mask[y, x + right + 1]: right += 1
-            score = up * down * left * right
-            if score > best_score:
-                best_score = score
-                best_pixel = (x, y)
-    return best_pixel
+    def same_count(x, y, dx, dy):
+        count = -1
+        while 0 <= x < w and 0 <= y < h and region_mask[y, x] == 1:
+            count += 1
+            x += dx
+            y += dy
+        return count
+
+    # Get all region pixel coords
+    ys, xs = np.nonzero(region_mask)
+    for x, y in zip(xs, ys):
+        score = (
+            same_count(x, y, -1, 0) *  # left
+            same_count(x, y, 1, 0) *   # right
+            same_count(x, y, 0, -1) *  # up
+            same_count(x, y, 0, 1)     # down
+        )
+        if score > best_score:
+            best_score = score
+            best_coord = (x, y)
+
+    return best_coord
 
 
 def collect_region_primitives(input_path, palette, font_size=None, font_path=None, tile_spacing=None,
@@ -66,15 +91,18 @@ def collect_region_primitives(input_path, palette, font_size=None, font_path=Non
 #                y = int(np.floor(c[0]))
 #                if 0 <= x < width and 0 <= y < height:
 #                    outline.append((x, y))
-            outline = []
+            outlines = []
 
             for contour in contours:
                 dense = interpolate_contour(contour, step=0.5)
+                outline = []
                 for x_f, y_f in dense:
                     x = int(np.floor(x_f))
                     y = int(np.floor(y_f))
                     if 0 <= x < width and 0 <= y < height:
                         outline.append((x, y))
+                if outline:
+                    outlines.append(outline)
 
             region_width = maxc - minc
             region_height = maxr - minr
@@ -86,46 +114,34 @@ def collect_region_primitives(input_path, palette, font_size=None, font_path=Non
 
             if label_mode == "centroid":
                 cx, cy = region.centroid
-                if 0 <= int(cx) < width and 0 <= int(cy) < height:
-                    labels = [dict(
-                        position=(int(cx), int(cy)),
-                        value=str(idx),
-                        font_size=local_font_size
-                    )]
+                cx = int(cx)
+                cy = int(cy)
+                print(f"label_pixel = ({cx}, {cy})")
+            
+                if 0 <= cx < width and 0 <= cy < height:
+                    labels = [make_label(cx, cy, idx, local_font_size)]
 
             elif label_mode == "stable":
                 sx, sy = find_stable_label_pixel(region_mask)
+                print(f"label_pixel = ({sx}, {sy})")
                 x = sx + minc
                 y = sy + minr
                 if 0 <= x < width and 0 <= y < height:
-                    labels = [dict(
-                        position=(x, y),
-                        value=str(idx),
-                        font_size=local_font_size
-                    )]
+                    labels = [make_label(x, y, idx, local_font_size)]
 
             elif label_mode == "diagonal":
                 for y in range(minr, min(maxr, height), local_spacing):
                     for x in range(minc, min(maxc, width), local_spacing):
                         if labeled_array[y, x] == region.label:
                             if x < width and y < height:
-                                labels.append(dict(
-                                    position=(x, y),
-                                    value=str(idx),
-                                    font_size=local_font_size
-                                ))
+                                labels.append(make_label(x, y, idx, local_font_size))
                             if x + local_spacing // 2 < width and y + local_spacing // 2 < height:
-                                labels.append(dict(
-                                    position=(x + local_spacing // 2, y + local_spacing // 2),
-                                    value=str(idx),
-                                    font_size=local_font_size
-                                ))
-
+                                labels.append(make_label(x, y, idx, local_font_size))
             else:
                 raise ValueError(f"Unknown label_mode: {label_mode}")
 
             primitives.append(dict(
-                outline=outline,
+                outline=outlines,
                 labels=labels,
                 region_id=region_id_counter,
                 color=tuple(int(c) for c in color)
@@ -198,7 +214,7 @@ def interpolate_contour(contour, step=0.5):
             dense_points.append((x, y))
     return dense_points
 
-def render_raster_from_primitives(canvas_size, primitives):
+def render_raster_from_primitives(canvas_size, primitives, font_path=None):
     """
     Render outlines and labels from previously collected primitives to a Pillow image.
     All lines and labels use light blue for PBN clarity.
@@ -209,16 +225,20 @@ def render_raster_from_primitives(canvas_size, primitives):
     pbn_color = (102, 204, 255)
 
     for region in primitives:
-        for x, y in region["outline"]:
-            if 0 <= x < width and 0 <= y < height:
-                draw.point((x, y), fill=pbn_color)
+        # Draw outlines
+        for contour in region["outline"]:
+            for x, y in contour:
+                if 0 <= x < width and 0 <= y < height:
+                    draw.point((x, y), fill=pbn_color)
 
+        # Draw labels
         for label in region["labels"]:
             font_size = label["font_size"]
-            if "font" not in label:
-                font = ImageFont.load_default()
+            if font_path and os.path.isfile(font_path):
+                font = ImageFont.truetype(font_path, font_size)
             else:
-                font = label["font"]
+                font = ImageFont.load_default()
+
             draw.text(label["position"], label["value"], fill=pbn_color, font=font)
 
     return output

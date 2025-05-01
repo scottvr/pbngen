@@ -24,23 +24,23 @@ def write_svg(
         color = "#66ccff"  # fixed light blue for PBN outlines and labels
 
 
-        # Draw outline
+        # Draw outlines
         if item.get("outline"):
-            # Filter out-of-bounds coords
-            outline = []
-            for x, y in item["outline"]:
-                if 0 <= x < width and 0 <= y < height:
-                    outline.append((int(x), int(y)))
-                else:
-                    print(f"⚠️ Outline point ({x},{y}) out of bounds")
+            for contour in item["outline"]:
+                filtered = []
+                for x, y in contour:
+                    if 0 <= x < width and 0 <= y < height:
+                        filtered.append((int(x), int(y)))
+                    else:
+                        print(f"⚠️ Outline point ({x},{y}) out of bounds")
 
-            if outline:
-                dwg.add(dwg.polyline(
-                    points=outline,
-                    stroke=color,
-                    fill="none",
-                    stroke_width=1
-                ))
+                if filtered:
+                    dwg.add(dwg.polyline(
+                        points=filtered,
+                        stroke=color,
+                        fill="none",
+                        stroke_width=1
+                    ))
 
         # Draw text labels
         for label in item.get("labels", []):

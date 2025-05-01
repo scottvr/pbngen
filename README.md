@@ -49,7 +49,7 @@ python pbnpy input.jpg --output-dir ./out \
   --yes
 ```
 
-### Output Files
+## Output Files
 
 - `out/quantized.png` — color-reduced version of the input
 - `out/labeled.png` — raster image with labeled regions
@@ -73,7 +73,7 @@ python pbnpy input.jpg --output-dir ./out \
 | `--skip-legend`  | Skip generation of the legend image                                         |
 | `--yes` / `-y`   | Overwrite existing output files without prompting                          |
 
-## Complexity Presets
+### Complexity Presets
 
 | Name         | Colors | Tile Spacing | Font Size |
 |--------------|--------|---------------|------------|
@@ -81,13 +81,26 @@ python pbnpy input.jpg --output-dir ./out \
 | `intermediate` | 12   | 30px          | 12         |
 | `master`     | 24     | 20px          | 10         |
 
-## Style Options
+### Style Options
 
 | Name       | Description                              |
 |------------|------------------------------------------|
 | `blur`     | Applies a Gaussian blur                  |
 | `pixelate` | Chunky low-resolution pixelation         |
 | `mosaic`   | Pixelate and upscale for blended effect  |
+
+### Label-modes (placement strategies)
+`diagonal` (default) 
+- instantaneous label placement
+- a little sloppy about it
+`centroid` 
+- label placement only in the centroid of the region
+- probably good for only very simple geometric shapes and images
+- slightly slower than diagonal's scorched earth placement
+`stable`
+- find the most 'stable' label location within a binary region.
+- a stable location is one that is most deeply surrounded by the same value in all four cardinal directions.
+- probably optimal placement, but far slower than the others
 
 ## License
 

@@ -20,11 +20,12 @@ def generate(
     palette_from: str = typer.Option(None, help="Path to image to extract fixed palette from."),
     font_path: str = typer.Option(None, help="Path to a .ttf font file."),
     font_size: int = typer.Option(None, help="Font size for overlay labels."),
-    label_mode: str = typer.Option("diagonal", help="Label placement mode: diagonal, centroid, stable."),
+    label_mode: str = typer.Option("diagonal", help="Labeling strategy: diagonal, centroid, stable."),
     tile_spacing: int = typer.Option(None, help="Distance between repeated numbers in a region."),
     swatch_size: int = typer.Option(40, help="Width/height of each color swatch in the legend."),
     legend_height: int = typer.Option(80, help="Height in pixels of the palette legend image."),
     skip_legend: bool = typer.Option(False, help="If set, skips generating the palette legend."),
+    raster_only: bool = typer.Option(False, help="Only generate raster output; skip vectorization"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Allow overwriting existing files.")
     ):
     """
@@ -32,7 +33,8 @@ def generate(
     """
     output_dir = outdir
     os.makedirs(output_dir, exist_ok=True)
-    output_paths = validate_output_dir(output_dir, overwrite=yes)
+    output_paths = validate_output_dir(output_dir, overwrite=yes,  
+                    expect=["quantized", "raster", "legend"] if raster_only else None)
 
     quantized_path = output_paths["quantized"]
     vector_path = output_paths["vector"]
@@ -83,21 +85,24 @@ def generate(
         palette=palette,
         font_size=font_size,
         font_path=font_path,
-        tile_spacing=tile_spacing
+        tile_spacing=tile_spacing,
+        label_mode=label_mode
     )
 
-    # Write vector (SVG) output
-    vector_output.write_svg(
-        output_path=vector_path,
-        canvas_size=canvas_size,
-        primitives=primitives
-    )
-    typer.echo(f"Saved vector-labeled output to: {vector_path}")
+    if not raster_only:
+        # Write vector (SVG) output
+        vector_output.write_svg(
+            output_path=vector_path,
+            canvas_size=canvas_size,
+            primitives=primitives
+        )
+        typer.echo(f"Saved vector-labeled output to: {vector_path}")
 
     # Write raster output using shared primitives
     labeled_img = segment.render_raster_from_primitives(
         canvas_size=canvas_size,
-        primitives=primitives
+        primitives=primitives,
+        font_path=font_path
     )
     labeled_img.save(labeled_path)
     typer.echo(f"Saved labeled image to: {labeled_path}")
