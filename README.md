@@ -93,16 +93,57 @@ python pbnpy input.jpg --output-dir ./out \
 `diagonal` (default) 
 - instantaneous label placement
 - a little sloppy about it
+  
 `centroid` 
 - label placement only in the centroid of the region
 - probably good for only very simple geometric shapes and images
 - slightly slower than diagonal's scorched earth placement
+
 `stable`
 - find the most 'stable' label location within a binary region.
 - a stable location is one that is most deeply surrounded by the same value in all four cardinal directions.
 - probably optimal placement, but far slower than the others
 
-## New Options for Painterly Blobbification
+### Pipeline Diagram
+The coordinates normalization and transformations have made the pipeline far more complex than it started or I intended. Thanks to ChatGPT's mermaid diagramming skills, we can visualize the pipeline like this:
+
+``` mermaid
+graph TD
+
+%% Input Image and Base Coordinate
+A["Input Image (NumPy / PIL)"] -->|RGB Array| B["img[y, x]"]
+
+%% Contour Extraction
+B -->|Binary Mask| C["find_contours(mask) (skimage)"]
+C -->|"Contours in (y, x)"| D["Flip: (y, x) → (x, y)"]
+
+%% Interpolation
+D --> E["interpolate_contour(contour)"]
+E --> F["Dense Points (x, y)"]
+
+%% Drawing Paths
+F --> G1["render_raster_from_primitives()"]
+F --> G2["write_svg()"]
+
+G1 -->|"PIL draw.point((x, y))"| H1["Labeled PNG Output"]
+G2 -->|"svgwrite polyline/label (x, y)"| H2["Vector SVG Output"]
+
+%% Label Placement
+B --> I["regionprops() centroid or stable"]
+I -->|"row, col"| J["Flip: (y, x) → (x, y)"]
+J -->|"Label Pos (x, y)"| G1
+J -->|"Label Pos (x, y)"| G2
+
+```
+## Painterliness is next to ~~Godli~~Working
+
+The `blobbify` branch has the early stages of getting more painterly output and end results if that sort of thing interests you.
+
+### Description
+
+When `--blobbify` is used, contiguous color regions are post-segmentation subdivided into smaller, organically shaped blobs. These simulate human brushstroke behavior and allow finer painterly texture in the paint-by-number output. The blob count is dynamically derived from region area and the specified min/max blob area.
+
+Blobs too small to accommodate the specified `--min-label-font` will be merged with the smallest adjacent (but > blob-min mm^2 blob in area) blob for legibility.
 
 ### Flags
 
@@ -112,13 +153,7 @@ python pbnpy input.jpg --output-dir ./out \
 | `--blob-min`        | Minimum blob area in mm² (default: 3)                                       |
 | `--blob-max`        | Maximum blob area in mm² (default: 30)                                      |
 | `--min-label-font`  | Minimum font size required for a blob to receive a label (default: 8)       |
-
-### Description
-
-When `--blobbify` is used, contiguous color regions are post-segmentation subdivided into smaller, organically shaped blobs. These simulate human brushstroke behavior and allow finer painterly texture in the paint-by-number output. The blob count is dynamically derived from region area and the specified min/max blob area.
-
-Blobs too small to accommodate the specified `--min-label-font` will be discarded to preserve legibility.
-
+| `--dpi`             | for painterly operations, we'll use print size. By default the source image dpi is used, but can be overridden with this flag.|
 ### Example
 
 ```bash
@@ -133,6 +168,7 @@ python pbnpy.py input.jpg \
 ```
 
 This example generates painterly blobs within each color region with sizes between 5–20 mm² and skips any that cannot fit a size 10 font label.
+
 
 ## License
 

@@ -31,6 +31,7 @@ def generate(
     blob_min: int = typer.Option(3, help="Minimum blob size in mm^2 (converted to pixels)."),
     blob_max: int = typer.Option(30, help="Maximum blob size in mm^2 (converted to pixels)."),
     min_label_font: int = typer.Option(8, help="Minimum font size allowed for blob labeling.")
+    interpolate_contours: bool = typer.Option(True, help="Interpolate contour lines (useful for raster, but can be skipped in vector)."),
 ):
     output_dir = outdir
     os.makedirs(output_dir, exist_ok=True)
@@ -86,7 +87,8 @@ def generate(
         font_size=font_size,
         font_path=font_path,
         tile_spacing=tile_spacing,
-        label_mode=label_mode
+        label_mode=label_mode,
+        interpolate_contours=interpolate_contours
     )
 
     if blobbify:
@@ -98,7 +100,8 @@ def generate(
             img_shape=img_data.shape[:2],
             min_blob_area=area_min_px,
             max_blob_area=area_max_px,
-            min_label_font_size=min_label_font
+            min_label_font_size=min_label_font,
+            interpolate_contours=interpolate_contours
         )
         typer.echo(f"Blobbified regions using {blob_min}-{blob_max} mm² area thresholds.")
 

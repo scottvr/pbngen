@@ -1,5 +1,5 @@
 from skimage.measure import regionprops, find_contours
-from scipy.ndimage import label as nd_label
+from skimage.measure import label as sklabel
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 import os
@@ -33,8 +33,8 @@ def find_stable_label_pixel(region_mask):
 def interpolate_contour(contour, step=0.5):
     dense = []
     for i in range(len(contour) - 1):
-        y0, x0 = contour[i]
-        y1, x1 = contour[i + 1]
+        x0, y0 = contour[i]  # contour is now (x, y)
+        x1, y1 = contour[i + 1]
         dist = np.hypot(x1 - x0, y1 - y0)
         for j in range(max(1, int(dist / step))):
             t = j / max(1, int(dist / step))
@@ -94,9 +94,11 @@ def blobbify_region(region_mask, min_blob_area, max_blob_area):
 
     return blobs
 
-def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, min_label_font_size=8):
+def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, min_label_font_size=8, interpolate_contours=True):
+    import scipy.ndimage as ndi
     h, w = img_shape
     new_primitives = []
+    masks = []
     region_id_counter = 0
 
     for region in primitives:
@@ -114,41 +116,94 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, min
 
         blobs = blobbify_region(mask, min_blob_area, max_blob_area)
         for blob_mask in blobs:
-            sub_labeled, _ = nd_label(blob_mask)
+            sub_labeled = sklabel(blob_mask)
             for subregion in regionprops(sub_labeled):
-                if subregion.area < min_blob_area:
-                    continue
+                area = subregion.area
                 sub_mask = (sub_labeled == subregion.label).astype(np.uint8)
-                contours = find_contours(sub_mask, level=0.5)
-                if not contours:
+                if area < 1:
                     continue
-                dense_outlines = []
-                for contour in contours:
-                    dense = interpolate_contour(contour, step=0.5)
-                    outline = [(int(xf), int(yf)) for yf, xf in dense if 0 <= int(xf) < w and 0 <= int(yf) < h]
-                    if outline:
-                        dense_outlines.append(outline)
-                sx, sy = find_stable_label_pixel(sub_mask)
-                minr, minc, _, _ = subregion.bbox
-                x, y = sx + minc, sy + minr
-                label_font_size = max(min_label_font_size, min(24, int(np.sqrt(subregion.area) / 3)))
-                if label_font_size < min_label_font_size:
-                    continue
-                original_palette_index = region["palette_index"] 
-                label = make_label(x, y, region.get("label", "?"), label_font_size)
-                new_primitives.append(dict(
-                    outline=dense_outlines,
-                    labels=[label],
-                    region_id=f'blob_{region_id_counter}',
-                    color=color,
-                    palette_index=original_palette_index,
-                ))
+
+                mask_entry = {
+                    "mask": sub_mask,
+                    "area": area,
+                    "color": color,
+                    "palette_index": region["palette_index"],
+                    "region_id": region_id_counter,
+                }
+                masks.append(mask_entry)
                 region_id_counter += 1
+
+    # PASS 2: Merge small blobs
+    merged = []
+    kept = []
+    used_ids = set()
+    for i, m in enumerate(masks):
+        if m["area"] >= min_blob_area:
+            kept.append(m)
+            continue
+
+        mask = m["mask"]
+        dilated = ndi.binary_dilation(mask, iterations=1)
+
+        best_match = None
+        same_color_neighbors = []
+        for j, n in enumerate(masks):
+            if i == j or n["region_id"] in used_ids or n["area"] < min_blob_area:
+                continue
+            overlap = np.any(dilated & n["mask"])
+            if not overlap:
+                continue
+            if n["palette_index"] == m["palette_index"]:
+                same_color_neighbors.append(n)
+            elif not best_match or n["area"] > best_match["area"]:
+                best_match = n
+
+        if same_color_neighbors:
+            target = same_color_neighbors[0]
+        elif best_match:
+            target = best_match
+        else:
+            # no neighbors at all; drop it
+            continue
+
+        # Merge masks
+        target["mask"] = ((target["mask"] | mask) > 0).astype(np.uint8)
+        target["area"] = target["mask"].sum()
+        used_ids.add(m["region_id"])
+
+    final_regions = kept
+    for m in final_regions:
+        sub_mask = m["mask"]
+        contours = find_contours(sub_mask, level=0.5)
+        if not contours:
+            continue
+        dense_outlines = []
+        for contour in contours:
+            flipped = [(x, y) for y, x in contour]  # flip to (x, y)
+            dense = interpolate_contour(flipped, step=0.5) if interpolate_contours else flipped
+            outline = [(int(xf), int(yf)) for xf, yf in dense if 0 <= int(xf) < w and 0 <= int(yf) < h]
+
+            if outline:
+                dense_outlines.append(outline)
+        sx, sy = find_stable_label_pixel(sub_mask)
+        minr, minc = np.min(np.nonzero(sub_mask), axis=1)
+        x, y = sx + minc, sy + minr
+        label_font_size = max(min_label_font_size, min(24, int(np.sqrt(m["area"]) / 3)))
+        if label_font_size < min_label_font_size:
+            continue
+        label = make_label(x, y, m["palette_index"], label_font_size)
+        new_primitives.append(dict(
+            outline=dense_outlines,
+            labels=[label],
+            region_id=f'merged_{m["region_id"]}',
+            color=m["color"],
+            palette_index=m["palette_index"],
+        ))
 
     return new_primitives
 
 def collect_region_primitives(input_path, palette, font_size=None, font_path=None, tile_spacing=None,
-                              min_region_area=50, label_mode="diagonal"):
+                              min_region_area=50, label_mode="diagonal", interpolate_contours=True):
     image = Image.open(input_path).convert("RGB")
     img_data = np.array(image)
     height, width = img_data.shape[:2]
@@ -158,7 +213,7 @@ def collect_region_primitives(input_path, palette, font_size=None, font_path=Non
 
     for idx, color in enumerate(palette):
         mask = np.all(img_data == color, axis=-1).astype(np.uint8)
-        labeled_array, _ = nd_label(mask)
+        labeled_array = sklabel(mask)
 
         for region in regionprops(labeled_array):
             if region.area < min_region_area or region.area > 0.95 * img_area:
@@ -172,8 +227,9 @@ def collect_region_primitives(input_path, palette, font_size=None, font_path=Non
             minr, minc, maxr, maxc = region.bbox
             outlines = []
             for contour in contours:
-                dense = interpolate_contour(contour, step=0.5)
-                outline = [(int(xf), int(yf)) for yf, xf in dense if 0 <= int(xf) < width and 0 <= int(yf) < height]
+                flipped = [(x, y) for y, x in contour]
+                dense = interpolate_contour(flipped, step=0.5) if interpolate_contours else flipped
+                outline = [(int(xf), int(yf)) for xf, yf in dense if 0 <= int(xf) < width and 0 <= int(yf) < height]
                 if outline:
                     outlines.append(outline)
 
