@@ -30,8 +30,9 @@ def generate(
     blobbify: bool = typer.Option(False, help="Enable painterly splitting of regions into blobs."),
     blob_min: int = typer.Option(3, help="Minimum blob size in mm^2 (converted to pixels)."),
     blob_max: int = typer.Option(30, help="Maximum blob size in mm^2 (converted to pixels)."),
-    min_label_font: int = typer.Option(8, help="Minimum font size allowed for blob labeling.")
+    min_label_font: int = typer.Option(8, help="Minimum font size allowed for blob labeling."),
     interpolate_contours: bool = typer.Option(True, help="Interpolate contour lines (useful for raster, but can be skipped in vector)."),
+       dpi: int = typer.Option(None, help="DPI to use for mm² → px² conversion when blobbifying. Overrides embedded DPI if provided.")
 ):
     output_dir = outdir
     os.makedirs(output_dir, exist_ok=True)
