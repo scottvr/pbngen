@@ -104,6 +104,42 @@ python pbnpy input.jpg --output-dir ./out \
 - a stable location is one that is most deeply surrounded by the same value in all four cardinal directions.
 - probably optimal placement, but far slower than the others
 
+### Pipeline Diagram
+The coordinates normalization and transformations have made the pipeline far more complex than it started or I intended. Thanks to ChatGPT's mermaid diagramming skills, we can visualize the pipeline like this:
+
+``` mermaid
+graph TD
+
+%% Input Image and Base Coordinate
+A["Input Image (NumPy / PIL)"] -->|RGB Array| B["img[y, x]"]
+
+%% Contour Extraction
+B -->|Binary Mask| C["find_contours(mask) (skimage)"]
+C -->|"Contours in (y, x)"| D["Flip: (y, x) → (x, y)"]
+
+%% Interpolation
+D --> E["interpolate_contour(contour)"]
+E --> F["Dense Points (x, y)"]
+
+%% Drawing Paths
+F --> G1["render_raster_from_primitives()"]
+F --> G2["write_svg()"]
+
+G1 -->|"PIL draw.point((x, y))"| H1["Labeled PNG Output"]
+G2 -->|"svgwrite polyline/label (x, y)"| H2["Vector SVG Output"]
+
+%% Label Placement
+B --> I["regionprops() centroid or stable"]
+I -->|"row, col"| J["Flip: (y, x) → (x, y)"]
+J -->|"Label Pos (x, y)"| G1
+J -->|"Label Pos (x, y)"| G2
+
+```
+## Painterliness is next to ~~Godli~~Working
+
+The `blobbify` branch has the early stages of getting more painterly output and end results if that sort of thing interests you.
+
+
 ## License
 
 MIT
