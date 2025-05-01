@@ -93,10 +93,12 @@ python pbnpy input.jpg --output-dir ./out \
 `diagonal` (default) 
 - instantaneous label placement
 - a little sloppy about it
+  
 `centroid` 
 - label placement only in the centroid of the region
 - probably good for only very simple geometric shapes and images
 - slightly slower than diagonal's scorched earth placement
+
 `stable`
 - find the most 'stable' label location within a binary region.
 - a stable location is one that is most deeply surrounded by the same value in all four cardinal directions.
