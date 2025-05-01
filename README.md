@@ -102,6 +102,38 @@ python pbnpy input.jpg --output-dir ./out \
 - a stable location is one that is most deeply surrounded by the same value in all four cardinal directions.
 - probably optimal placement, but far slower than the others
 
+## New Options for Painterly Blobbification
+
+### Flags
+
+| Flag                | Description                                                                 |
+|---------------------|-----------------------------------------------------------------------------|
+| `--blobbify`        | Enable painterly splitting of color regions into brush-stroke-like blobs     |
+| `--blob-min`        | Minimum blob area in mm² (default: 3)                                       |
+| `--blob-max`        | Maximum blob area in mm² (default: 30)                                      |
+| `--min-label-font`  | Minimum font size required for a blob to receive a label (default: 8)       |
+
+### Description
+
+When `--blobbify` is used, contiguous color regions are post-segmentation subdivided into smaller, organically shaped blobs. These simulate human brushstroke behavior and allow finer painterly texture in the paint-by-number output. The blob count is dynamically derived from region area and the specified min/max blob area.
+
+Blobs too small to accommodate the specified `--min-label-font` will be discarded to preserve legibility.
+
+### Example
+
+```bash
+python pbnpy.py input.jpg \
+  --output-dir ./out \
+  --blobbify \
+  --blob-min 5 \
+  --blob-max 20 \
+  --min-label-font 10 \
+  --font ./fonts/DejaVuSansMono.ttf \
+  --yes
+```
+
+This example generates painterly blobs within each color region with sizes between 5–20 mm² and skips any that cannot fit a size 10 font label.
+
 ## License
 
 MIT
