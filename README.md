@@ -72,6 +72,9 @@ python pbnpy input.jpg --output-dir ./out \
 | `--legend-height`| Height of the swatch legend image                                           |
 | `--skip-legend`  | Skip generation of the legend image                                         |
 | `--yes` / `-y`   | Overwrite existing output files without prompting                          |
+| `--interpolate-contours` | Enable interpolation of contour edges for smoother shapes (default: on; disable for simpler SVGs) |
+i| `--dpi`         | DPI to use for mm² → px² conversion when blobbifying. Overrides embedded DPI if provided." |
+
 
 ### Complexity Presets
 
