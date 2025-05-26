@@ -98,6 +98,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `OUTPUT_DIRECTORY`            | (Positional) Path to the directory where output files will be saved.                                                                      | **Required** |
 | `--complexity TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
 | `--style TEXT`                | Preprocessing style to apply to the input image: `blur`, `pixelate`, `mosaic`.                                                            | `None`         |
+| `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
 | `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
 | `--palette-from FILE_PATH`    | Path to an image to extract a fixed palette from for the final PBN colors. This image is also subject to `--bpp` pre-quantization.        | `None`         |

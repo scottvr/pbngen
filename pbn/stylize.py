@@ -1,5 +1,5 @@
 from PIL import Image, ImageFilter
-
+from typing import Optional
 
 def apply_style(input_path, output_path, style, blur_radius: Optional[int] = None, pixelate_block_size: Optional[int] = None, mosaic_block_size: Optional[int] = None):
     """
