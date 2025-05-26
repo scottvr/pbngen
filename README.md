@@ -49,7 +49,7 @@ python pbnpy.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
 
-### Full Example
+### More Complex Example
 
 ```bash
 python pbnpy.py "Vacation Pic.png" "./Vacation PBN" \
@@ -90,7 +90,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/bpp_quantized_input.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
     - `out/bpp_quantized_palette_source.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
-## Tips for best results!
+## Tips for Best Results!
 
 - for complex images, `--style blur` almost always helps a ton.
 - for simple, clean low-color images (like logos) don't blur first
