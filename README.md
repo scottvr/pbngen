@@ -90,6 +90,15 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/bpp_quantized_input.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
     - `out/bpp_quantized_palette_source.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
+## Tips for best results!
+
+- for complex images, `--style blur` almost always helps a ton.
+- for simple, clean low-color images (like logos) don't blur first
+- experiment; try both and see which gives better results
+- **likewise for the rest of the options below. Try a smaller font size. Try mixing and matching complexity presets with non-default font-size, tile-spacing, etc.**
+- Please read the documentation to the end and try a few settings before opening an Issue
+- If it really seems that pbnpy is failing to make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
+
 ## Options
 
 | Flag                          | Description                                                                                                                               | Default        |
