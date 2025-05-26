@@ -193,6 +193,38 @@ First, select a style with `--style <style_name>`, then optionally add its corre
 
 If you specify a style parameter flag (e.g., `--blur-radius`) without the corresponding `--style` flag (e.g., `--style blur`), the parameter flag will be ignored as no style is being applied. The parameter flags are only active when their associated style is selected.
 
+### Specifying Physical Canvas Size for Printing (`--canvas-size`)
+
+To prepare your paint-by-number output for printing on a specific physical canvas size (e.g., an 8x10 inch sheet, A4 paper), you can use the `--canvas-size` option.
+
+| Flag                          | Description                                                                                                                                                              | Example Usage                     |
+|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| `--canvas-size TEXT`          | Sets the desired physical dimensions for the final output. The image content will be scaled to fit these dimensions (maintaining aspect ratio) and centered on a white background of this size. The format is `WIDTHxHEIGHTUNIT` (no spaces around `x`). Supported units: `in` (inches), `cm` (centimeters), `mm` (millimeters). This option relies on an accurately set DPI (see `--dpi`). | `--canvas-size "10x8in"` <br> `--canvas-size "29.7x21cm"` <br> `--canvas-size "250x200mm"` |
+
+**How it Works:**
+
+1.  You provide the desired physical dimensions and unit (e.g., `"10x8in"`; units can be `in`, `cm`, or `mm`).
+2.  The script uses the **effective DPI** (Dots Per Inch) to convert these physical dimensions into pixel dimensions for the output canvas.
+    * The effective DPI is determined by:
+        1.  The value you provide with the `--dpi` flag (e.g., `--dpi 300`).
+        2.  If `--dpi` is not set, the DPI from the input image's metadata (if available).
+        3.  If neither is available, a default of 96 DPI is used.
+3.  The original image (after any styling or BPP pre-quantization) is then intelligently resized to fit within these target pixel dimensions while maintaining its original aspect ratio.
+4.  A new canvas is created with the exact target pixel dimensions and a white background.
+5.  The resized image content is centered onto this new canvas.
+6.  All subsequent processing (final PBN color quantization, segmentation, labeling, SVG/PNG output) occurs on this new, dimensionally-correct canvas.
+
+**Example:**
+
+To generate a paint-by-number that will be printed on a 12x16 inch canvas at 300 DPI:
+
+```bash
+python pbnpy.py my_image.jpg ./output_12x16 \
+  --canvas-size "12x16in" \
+  --dpi 300 \
+  --num-colors 1
+```
+
 ### Label Modes (Placement Strategies)
 
 -   `diagonal` (default): Fast, places labels on a diagonal grid within regions. Can sometimes be dense.

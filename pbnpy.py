@@ -3,7 +3,8 @@ from pbn import quantize, segment, legend, stylize, palette_tools, vector_output
 import os
 from pathlib import Path
 import numpy as np
-from PIL import Image, UnidentifiedImageError # Added UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError, ImageOps # Added ImageOps for potential future use
+import re # Added re for parsing
 from typing import Optional
 
 app = typer.Typer(
@@ -15,14 +16,59 @@ app = typer.Typer(
 import rich.traceback
 rich.traceback.install(show_locals=False, suppress=[__name__])
 
-# Helper function for Pillow quantization (remains the same)
+# Helper function for Pillow quantization
 def quantize_pil_image(image_pil: Image.Image, num_quant_colors: int, method=Image.Quantize.MEDIANCUT) -> Image.Image:
     if image_pil.mode not in ('P', 'L'):
         image_pil = image_pil.convert('RGB')
-    if image_pil.mode == 'P':
+    if image_pil.mode == 'P': # If it's already palettized, convert to RGB to re-quantize accurately
         image_pil = image_pil.convert('RGB')
     return image_pil.quantize(colors=num_quant_colors, method=method)
 
+def parse_canvas_size_to_pixels(size_str: str, dpi: float) -> Optional[tuple[int, int]]:
+    """
+    Parses a canvas size string (e.g., '10x8in', '29.7x21cm') and converts to pixel dimensions.
+    Returns (width_px, height_px) or None if parsing fails.
+    """
+    match = re.fullmatch(r"([\d.]+)\s*x\s*([\d.]+)\s*(in|cm|mm)", size_str.lower())
+    if not match:
+        typer.secho(f"Error: Invalid --canvas-size format: '{size_str}'. "
+                    "Expected format like '10x8in', '29.7x21cm', or '200x300mm'.",
+                    fg=typer.colors.RED)
+        return None
+
+    try:
+        width, height, unit = float(match.group(1)), float(match.group(2)), match.group(3)
+    except ValueError:
+        typer.secho(f"Error: Invalid numeric values in --canvas-size: '{size_str}'.", fg=typer.colors.RED)
+        return None
+
+    if unit == "cm":
+        width_in = width / 2.54
+        height_in = height / 2.54
+    elif unit == "mm":
+        width_in = width / 25.4
+        height_in = height / 25.4
+    elif unit == "in":
+        width_in = width
+        height_in = height
+    else: # Should not happen due to regex
+        typer.secho(f"Error: Unknown unit '{unit}' in --canvas-size string.", fg=typer.colors.RED)
+        return None
+
+    if width_in <= 0 or height_in <= 0:
+        typer.secho(f"Error: Canvas dimensions must be positive. Got {width}x{height} {unit}.", fg=typer.colors.RED)
+        return None
+
+    # Important: Round to nearest whole pixel
+    target_width_px = round(width_in * dpi)
+    target_height_px = round(height_in * dpi)
+    
+    if target_width_px < 1 or target_height_px < 1:
+        typer.secho(f"Error: Calculated pixel dimensions ({target_width_px}x{target_height_px}) for canvas are too small (< 1px). "
+                    f"Check canvas size ('{size_str}') and DPI ({dpi}).", fg=typer.colors.RED)
+        return None
+
+    return target_width_px, target_height_px
 
 @app.callback(invoke_without_command=True)
 def pbn_cli(
@@ -53,6 +99,16 @@ def pbn_cli(
     palette_from: Optional[Path] = typer.Option(
         None, "--palette-from", help="Path to image to extract fixed palette from.",
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
+    ),
+    canvas_size_str: Optional[str] = typer.Option( # New option for canvas size string
+        None, "--canvas-size",
+        help="Desired physical canvas size for the output (e.g., '10x8in', '29.7x21cm', '200x300mm'). "
+             "Image is scaled to fit (maintaining aspect ratio) on a white background of this size. Uses DPI from --dpi."
+    ),
+    dpi: Optional[int] = typer.Option( # Existing DPI option
+        None, "--dpi", 
+        help="Target Dots Per Inch. Used for --canvas-size calculation and mm² to px² conversion in --blobbify. "
+             "Overrides DPI from image metadata if provided. Default: Tries image metadata, then 96."
     ),
     # --- Style Options ---
     style: Optional[str] = typer.Option(
@@ -85,7 +141,6 @@ def pbn_cli(
     raster_only: bool = typer.Option(False, "--raster-only", help="Skip vector SVG output."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Overwrite existing files."),
     interpolate_contours: bool = typer.Option(True, "--interpolate-contours/--no-interpolate-contours", help="Smooth contour lines. Default: True."),
-    dpi: Optional[int] = typer.Option(None, "--dpi", help="DPI for mm² to px² conversion. Default: Auto or 96."),
     # --- Blobbify Options ---
     blobbify: bool = typer.Option(False, "--blobbify", help="Split regions into smaller 'blobs'."),
     blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm² (if blobbify). Default: 3."),
@@ -107,14 +162,18 @@ def pbn_cli(
     if not raster_only: expected_outputs.append("vector")
     output_paths = validate_output_dir(output_dir, overwrite=yes, expect=expected_outputs)
 
-    styled_path = output_dir / "styled_input.png"
-    bpp_quantized_input_path = output_dir / "bpp_quantized_input.png"
-    bpp_quantized_palette_path = output_dir / "bpp_quantized_palette_source.png"
-    quantized_pbn_path = output_paths["quantized"]
+    # Define paths for intermediate and final outputs
+    styled_path = output_paths["styled_input"]
+    bpp_quantized_input_path = output_paths["bpp_quantized_input"]
+    bpp_quantized_palette_path = output_paths["bpp_quantized_palette_source"]
+    canvas_scaled_input_path = output_paths["canvas_scaled_input"] # New intermediate file path
+
+    quantized_pbn_path = output_paths["quantized"] 
     labeled_path = output_paths["raster"]
     legend_path = output_paths["legend"]
     vector_path = output_paths.get("vector")
 
+    # --- Determine effective PBN num_colors, font_size, tile_spacing ---
     effective_pbn_num_colors = num_colors
     effective_tile_spacing = tile_spacing
     effective_font_size = font_size
@@ -136,26 +195,45 @@ def pbn_cli(
     if effective_font_size is None: effective_font_size = 12
     typer.echo(f"Final PBN palette will aim for {effective_pbn_num_colors} colors.")
 
+    # --- Determine effective DPI (used for canvas scaling and blobbify) ---
+    effective_dpi_val = dpi 
+    if not effective_dpi_val:
+        try:
+            with Image.open(input_path) as img_orig_for_dpi:
+                dpi_info = img_orig_for_dpi.info.get('dpi')
+                if dpi_info and isinstance(dpi_info, (tuple, list)) and len(dpi_info) > 0 and dpi_info[0] > 0:
+                    effective_dpi_val = dpi_info[0]
+                    typer.echo(f"Using DPI from input image metadata: {effective_dpi_val}")
+                else:
+                    effective_dpi_val = 96 # Default if not found or invalid in image
+                    typer.echo(f"DPI not found or invalid in image metadata, defaulting to {effective_dpi_val} DPI for internal calculations.")
+        except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
+            effective_dpi_val = 96 # Default on error
+            typer.echo(f"Could not read DPI from input image ({e}), defaulting to {effective_dpi_val} DPI for internal calculations.")
+    else:
+        typer.echo(f"Using user-provided DPI: {effective_dpi_val}")
+
+
+    # --- Stage 0: Styling (if any) ---
     current_input_image_path_for_processing: Path = input_path
     if style:
         try:
             typer.echo(f"Applying style '{style}'...")
             stylize.apply_style(
-                input_path, 
-                styled_path, 
-                style,
-                blur_radius=blur_radius, # Pass the CLI option value
-                pixelate_block_size=pixelate_block_size, # Pass the CLI option value
-                mosaic_block_size=mosaic_block_size # Pass the CLI option value
+                input_path, styled_path, style,
+                blur_radius=blur_radius,
+                pixelate_block_size=pixelate_block_size,
+                mosaic_block_size=mosaic_block_size
             )
             current_input_image_path_for_processing = styled_path
             typer.echo(f"Styled image saved to: {styled_path}")
-        except ValueError as e: # Catch specific ValueErrors from stylize.py
+        except ValueError as e: # Specific error from stylize for bad style name or params
              typer.secho(f"Styling error: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
-        except Exception as e:
+        except Exception as e: # Catch other unexpected errors during styling
             typer.secho(f"Unexpected error applying style: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-    path_to_main_image_for_pbn_quantization: Path = current_input_image_path_for_processing
+    # --- Stage 1: BPP Pre-quantization (if --bpp is set) ---
+    path_to_main_image_for_canvas_scaling: Path = current_input_image_path_for_processing
     path_to_palette_image_for_extraction: Optional[Path] = palette_from
 
     if bpp is not None:
@@ -169,21 +247,86 @@ def pbn_cli(
             with Image.open(current_input_image_path_for_processing) as img_pil:
                 pre_quant_input_pil = quantize_pil_image(img_pil, num_bpp_quant_colors)
                 pre_quant_input_pil.save(bpp_quantized_input_path)
-            path_to_main_image_for_pbn_quantization = bpp_quantized_input_path
+            path_to_main_image_for_canvas_scaling = bpp_quantized_input_path
             typer.echo(f"Pre-quantized input image saved to: {bpp_quantized_input_path}")
         except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
             typer.secho(f"Error pre-quantizing input image {current_input_image_path_for_processing}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-        if palette_from:
+        if palette_from: 
             try:
-                with Image.open(palette_from) as palette_img_pil:
+                with Image.open(palette_from) as palette_img_pil: 
                     pre_quant_palette_pil = quantize_pil_image(palette_img_pil, num_bpp_quant_colors)
                     pre_quant_palette_pil.save(bpp_quantized_palette_path)
-                path_to_palette_image_for_extraction = bpp_quantized_palette_path
+                path_to_palette_image_for_extraction = bpp_quantized_palette_path 
                 typer.echo(f"Pre-quantized palette source image saved to: {bpp_quantized_palette_path}")
             except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
                 typer.secho(f"Error pre-quantizing palette source image {palette_from}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
     
+    # --- Stage 2: Canvas Scaling (if --canvas-size is set) ---
+    path_to_main_image_for_pbn_quantization: Path = path_to_main_image_for_canvas_scaling
+    # This variable will hold the definitive pixel dimensions for the final output canvas.
+    # It's initialized by opening the image that's about to be PBN-quantized, then overridden if --canvas-size is used.
+    output_canvas_dimensions_px: tuple[int, int] 
+
+    if canvas_size_str:
+        dpi_for_canvas = effective_dpi_val # Use the globally determined effective_dpi_val
+        typer.echo(f"Targeting canvas size '{canvas_size_str}' using DPI {dpi_for_canvas}.")
+        # Warn if the DPI is low for typical print quality, especially if it defaulted and wasn't user-set for this purpose.
+        if dpi_for_canvas < 150 and not dpi: # 'dpi' is the direct CLI option value
+             typer.secho(f"Note: The DPI for canvas scaling is {dpi_for_canvas} (derived from image or default). "
+                        "For specific print quality, explicitly use --dpi with a higher value (e.g., --dpi 300).", fg=typer.colors.BLUE)
+
+        parsed_target_dims_px = parse_canvas_size_to_pixels(canvas_size_str, dpi_for_canvas)
+        if parsed_target_dims_px is None:
+            raise typer.Exit(code=1) # Error already printed by parser
+
+        target_canvas_width_px, target_canvas_height_px = parsed_target_dims_px
+        output_canvas_dimensions_px = (target_canvas_width_px, target_canvas_height_px) # This is the target
+
+        try:
+            with Image.open(path_to_main_image_for_canvas_scaling) as img_to_scale_on_canvas:
+                img_to_scale_on_canvas_rgba = img_to_scale_on_canvas.convert("RGBA") # Use RGBA for safe pasting with alpha
+                source_w, source_h = img_to_scale_on_canvas_rgba.size
+
+                if source_w == 0 or source_h == 0: # Should not happen with valid images
+                    typer.secho(f"Error: Source image for canvas scaling has zero dimension: {source_w}x{source_h}", fg=typer.colors.RED)
+                    raise typer.Exit(code=1)
+
+                img_aspect_ratio = source_w / source_h
+                canvas_aspect_ratio = target_canvas_width_px / target_canvas_height_px
+
+                if img_aspect_ratio > canvas_aspect_ratio: # Image is wider aspect than canvas, fit to canvas width
+                    scaled_w = target_canvas_width_px
+                    scaled_h = round(scaled_w / img_aspect_ratio)
+                else: # Image is taller or same aspect as canvas, fit to canvas height
+                    scaled_h = target_canvas_height_px
+                    scaled_w = round(scaled_h * img_aspect_ratio)
+                
+                scaled_w = max(1, scaled_w) # Ensure at least 1px
+                scaled_h = max(1, scaled_h)
+                
+                resized_content_img = img_to_scale_on_canvas_rgba.resize((scaled_w, scaled_h), Image.Resampling.LANCZOS)
+                
+                # Create new canvas with white background
+                final_output_pil_canvas = Image.new("RGB", (target_canvas_width_px, target_canvas_height_px), (255, 255, 255))
+                
+                paste_x = (target_canvas_width_px - scaled_w) // 2
+                paste_y = (target_canvas_height_px - scaled_h) // 2
+                
+                # Paste using alpha channel of resized_content_img as mask
+                final_output_pil_canvas.paste(resized_content_img, (paste_x, paste_y), resized_content_img) 
+                
+                final_output_pil_canvas.save(canvas_scaled_input_path)
+            path_to_main_image_for_pbn_quantization = canvas_scaled_input_path 
+            typer.echo(f"Image placed on {target_canvas_width_px}x{target_canvas_height_px}px canvas, saved to: {canvas_scaled_input_path}")
+
+        except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
+            typer.secho(f"Error scaling image to canvas size for '{path_to_main_image_for_canvas_scaling}': {e}", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+    # If canvas_size_str was NOT used, output_canvas_dimensions_px will be set from the image that is PBN quantized.
+    # This happens when `quantized_pbn_path` is opened for segmentation.
+
+    # --- Stage 3: PBN Quantization ---
     fixed_pbn_palette_data = None
     if path_to_palette_image_for_extraction:
         try:
@@ -206,14 +349,29 @@ def pbn_cli(
     except Exception as e:
         typer.secho(f"Error during final PBN quantization of {path_to_main_image_for_pbn_quantization}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
+    # --- Segmentation and Output Generation ---
+    # The canvas_size for SVG and rendering primitives is determined by the dimensions of quantized_pbn_path
+    canvas_size_for_final_output: tuple[int, int]
     try:
         img_pil_for_segmentation = Image.open(quantized_pbn_path).convert("RGB")
         img_data_for_segmentation = np.array(img_pil_for_segmentation)
-        canvas_width, canvas_height = img_pil_for_segmentation.size
-        canvas_size = (canvas_width, canvas_height)
-        typer.echo(f"Canvas size for segmentation: {canvas_width}x{canvas_height} pixels.")
+        canvas_width, canvas_height = img_pil_for_segmentation.size 
+        canvas_size_for_final_output = (canvas_width, canvas_height)
+        
+        # If canvas_size_str was used, output_canvas_dimensions_px should have been set to the target.
+        # Now, we confirm that quantized_pbn_path actually has these dimensions.
+        if canvas_size_str:
+            if output_canvas_dimensions_px != canvas_size_for_final_output:
+                 typer.secho(f"Internal Warning: Expected canvas dimensions {output_canvas_dimensions_px} but "
+                            f"PBN quantized image is {canvas_size_for_final_output}. Using actual size for output.", fg=typer.colors.YELLOW)
+            # Even if there's a warning, use the actual dimensions of the image we're segmenting
+            # for subsequent steps, as that's the ground truth.
+            # However, output_canvas_dimensions_px was the *target* and should match.
+            # For consistency, if scaling happened, canvas_size_for_final_output *is* output_canvas_dimensions_px.
+        
+        typer.echo(f"Using canvas size for segmentation/output: {canvas_size_for_final_output[0]}x{canvas_size_for_final_output[1]} pixels (from '{quantized_pbn_path}').")
     except Exception as e:
-        typer.secho(f"Error opening PBN quantized image {quantized_pbn_path}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
+        typer.secho(f"Error opening PBN quantized image {quantized_pbn_path} for final processing: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
     primitives = segment.collect_region_primitives(
         input_path=quantized_pbn_path, palette=final_pbn_palette,
@@ -223,24 +381,13 @@ def pbn_cli(
     )
     typer.echo(f"Collected {len(primitives)} initial regions for labeling.")
 
-    if blobbify:
+    if blobbify: 
         typer.echo("Applying blobbification...")
-        effective_dpi_val = dpi
-        if not effective_dpi_val:
-            try:
-                with Image.open(input_path) as img_orig_for_dpi:
-                    dpi_info = img_orig_for_dpi.info.get('dpi')
-                    if dpi_info and isinstance(dpi_info, (tuple, list)) and len(dpi_info) > 0:
-                        effective_dpi_val = dpi_info[0]
-                        typer.echo(f"Using DPI from input image metadata: {effective_dpi_val}")
-                    else: effective_dpi_val = 96; typer.echo(f"DPI not found, defaulting to {effective_dpi_val} DPI.")
-            except: effective_dpi_val = 96; typer.echo(f"Could not read DPI, defaulting to {effective_dpi_val} DPI.")
-        else: typer.echo(f"Using user-provided DPI: {effective_dpi_val}")
-
+        # effective_dpi_val was calculated earlier and is used for blobbify's mm to px conversion
         px_per_mm = effective_dpi_val / 25.4
         area_min_px = int(blob_min * (px_per_mm ** 2))
         area_max_px = int(blob_max * (px_per_mm ** 2))
-        typer.echo(f"Blobbify settings: min={area_min_px}px² ({blob_min}mm²), max={area_max_px}px² ({blob_max}mm²) at {effective_dpi_val} DPI.")
+        typer.echo(f"Blobbify settings: DPI={effective_dpi_val}, min_area={area_min_px}px² ({blob_min}mm²), max_area={area_max_px}px² ({blob_max}mm²).")
 
         primitives = segment.blobbify_primitives(
             primitives, img_shape=img_data_for_segmentation.shape[:2],
@@ -251,12 +398,12 @@ def pbn_cli(
 
     if not raster_only and vector_path:
         try:
-            vector_output.write_svg(vector_path, canvas_size, primitives)
+            vector_output.write_svg(vector_path, canvas_size_for_final_output, primitives)
             typer.echo(f"Saved vector (SVG) output to: {vector_path}")
         except Exception as e: typer.secho(f"Error writing SVG output: {e}", fg=typer.colors.RED)
 
     try:
-        labeled_img = segment.render_raster_from_primitives(canvas_size, primitives, font_path)
+        labeled_img = segment.render_raster_from_primitives(canvas_size_for_final_output, primitives, font_path)
         labeled_img.save(labeled_path)
         typer.echo(f"Saved labeled raster (PNG) image to: {labeled_path}")
     except Exception as e: typer.secho(f"Error rendering/saving raster image: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
@@ -279,20 +426,28 @@ def validate_output_dir(
     output_dir: Path, overwrite: bool = False, expect: Optional[list[str]] = None,
 ) -> dict[str, Path]:
     default_file_names = {
-        "quantized": "quantized_pbn.png",
+        "quantized": "quantized_pbn.png", 
         "vector": "vector.svg",
         "legend": "legend.png",
         "raster": "labeled.png",
+        # Intermediate files
         "styled_input": "styled_input.png",
         "bpp_quantized_input": "bpp_quantized_input.png",
-        "bpp_quantized_palette_source": "bpp_quantized_palette_source.png"
+        "bpp_quantized_palette_source": "bpp_quantized_palette_source.png",
+        "canvas_scaled_input": "canvas_scaled_input.png" # New intermediate
     }
-    final_output_keys = ["quantized", "vector", "legend", "raster"]
+    
+    final_output_keys_to_check = ["quantized", "vector", "legend", "raster"] 
     files_to_check_for_clobber: list[Path] = []
-    if expect:
+
+    # If 'expect' is provided, it should list the keys of final outputs we intend to generate in this run.
+    # We only check these expected final outputs for clobbering.
+    if expect: 
         for key in expect:
-            if key in default_file_names:
+            if key in default_file_names and key in final_output_keys_to_check: # Ensure it's a known final output key
                  files_to_check_for_clobber.append(output_dir / default_file_names[key])
+    # If 'expect' is not provided (e.g. for some reason or future use), could default to checking all known final outputs.
+    # However, the main CLI call to validate_output_dir *does* provide 'expect'.
     
     if not overwrite and files_to_check_for_clobber:
         clobbered_files_found = [str(p) for p in files_to_check_for_clobber if p.exists()]
