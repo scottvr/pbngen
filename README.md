@@ -162,6 +162,37 @@ If `--palette-from MY_PALETTE.PNG` is also used with `--bpp 8` and `--num-colors
 | `pixelate` | Chunky low-resolution pixelation.        |
 | `mosaic`   | Pixelate and upscale for blended effect. |
 
+### Styling Options and Parameters
+
+The `--style TEXT` option allows you to apply a visual preprocessing effect to your input image. The available styles are `blur`, `pixelate`, and `mosaic`. You can further control the intensity or characteristics of these styles using the following parameters:
+
+| Style Selected      | Parameter Flag              | Description                                                                                                        | Default Behavior (if flag not used)                                    |
+|---------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| `--style blur`      | `--blur-radius INTEGER`     | Sets the radius for the Gaussian blur effect. Higher values increase blurriness. Must be a positive integer.        | `4` (as defined in the `stylize` module)                             |
+| `--style pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
+| `--style mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
+
+**How to Use:**
+
+First, select a style with `--style <style_name>`, then optionally add its corresponding parameter flag. For example:
+
+* To apply a blur with a radius of 7:
+    ```bash
+    python pbnpy.py input.jpg ./output --style blur --blur-radius 7
+    ```
+
+* To apply pixelation with a block size of 10 pixels:
+    ```bash
+    python pbnpy.py input.jpg ./output --style pixelate --pixelate-block-size 10
+    ```
+
+* To apply the mosaic effect with its default (dynamically calculated) block size:
+    ```bash
+    python pbnpy.py input.jpg ./output --style mosaic
+    ```
+
+If you specify a style parameter flag (e.g., `--blur-radius`) without the corresponding `--style` flag (e.g., `--style blur`), the parameter flag will be ignored as no style is being applied. The parameter flags are only active when their associated style is selected.
+
 ### Label Modes (Placement Strategies)
 
 -   `diagonal` (default): Fast, places labels on a diagonal grid within regions. Can sometimes be dense.

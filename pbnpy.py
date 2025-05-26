@@ -3,7 +3,7 @@ from pbn import quantize, segment, legend, stylize, palette_tools, vector_output
 import os
 from pathlib import Path
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError # Added UnidentifiedImageError
 from typing import Optional
 
 app = typer.Typer(
@@ -15,19 +15,12 @@ app = typer.Typer(
 import rich.traceback
 rich.traceback.install(show_locals=False, suppress=[__name__])
 
-# Helper function for Pillow quantization
+# Helper function for Pillow quantization (remains the same)
 def quantize_pil_image(image_pil: Image.Image, num_quant_colors: int, method=Image.Quantize.MEDIANCUT) -> Image.Image:
-    """Quantizes a PIL Image object to a specific number of colors."""
-    # Ensure image is in RGB before quantizing if it's not already P or L
     if image_pil.mode not in ('P', 'L'):
         image_pil = image_pil.convert('RGB')
-    
-    # Pillow's quantize works best on L or RGB modes.
-    # If it's already 'P', it might be best to convert to RGB then quantize,
-    # unless the existing palette is already what we want (which is unlikely here).
     if image_pil.mode == 'P':
         image_pil = image_pil.convert('RGB')
-
     return image_pil.quantize(colors=num_quant_colors, method=method)
 
 
@@ -46,25 +39,38 @@ def pbn_cli(
         metavar="OUTPUT_DIRECTORY",
         file_okay=False, dir_okay=True, writable=True, resolve_path=True,
     ),
+    # --- General Options ---
     complexity: Optional[str] = typer.Option(
         None, help="Preset complexity level: beginner, intermediate, master."
-    ),
-    style: Optional[str] = typer.Option(
-        None, "--style", help="Optional style to apply: blur, mosaic, pixelate."
     ),
     num_colors: Optional[int] = typer.Option(
         None, "--num-colors", help="Final number of colors for the PBN palette. Default: 12."
     ),
     bpp: Optional[int] = typer.Option(
         None, "--bpp",
-        help="Bits Per Pixel for an initial color depth reduction (e.g., 8 for 256 colors). "
-             "Applied to the input image (and --palette-from image) BEFORE final PBN quantization. "
-             "Range: 1-8."
+        help="Bits Per Pixel (1-8) for an initial color depth reduction. Applied before final PBN quantization."
     ),
     palette_from: Optional[Path] = typer.Option(
         None, "--palette-from", help="Path to image to extract fixed palette from.",
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
     ),
+    # --- Style Options ---
+    style: Optional[str] = typer.Option(
+        None, "--style", help="Optional style to apply: blur, pixelate, mosaic."
+    ),
+    blur_radius: Optional[int] = typer.Option(
+        None, "--blur-radius", min=1,
+        help="Radius for Gaussian blur if --style is 'blur'. Default: 4 (from stylize module)."
+    ),
+    pixelate_block_size: Optional[int] = typer.Option(
+        None, "--pixelate-block-size", min=1,
+        help="Block size (pixels) for 'pixelate' style. Default: dynamic (approx image_min_dim/64, min 4)."
+    ),
+    mosaic_block_size: Optional[int] = typer.Option(
+        None, "--mosaic-block-size", min=1,
+        help="Block size (pixels) for 'mosaic' style. Default: dynamic (approx image_min_dim/64, min 4)."
+    ),
+    # --- Font and Label Options ---
     font_path: Optional[Path] = typer.Option(
         None, "--font-path", help="Path to a .ttf font file.",
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
@@ -72,16 +78,19 @@ def pbn_cli(
     font_size: Optional[int] = typer.Option(None, "--font-size", help="Base font size. Default: 12."),
     label_mode: str = typer.Option("diagonal", "--label-mode", help="Labeling strategy. Default: diagonal."),
     tile_spacing: Optional[int] = typer.Option(None, "--tile-spacing", help="Label distance. Default: 30px."),
+    # --- Legend Options ---
     swatch_size: int = typer.Option(40, "--swatch-size", help="Legend swatch size. Default: 40px."),
     skip_legend: bool = typer.Option(False, "--skip-legend", help="Skip generating palette legend."),
+    # --- Output and Operational Options ---
     raster_only: bool = typer.Option(False, "--raster-only", help="Skip vector SVG output."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Overwrite existing files."),
+    interpolate_contours: bool = typer.Option(True, "--interpolate-contours/--no-interpolate-contours", help="Smooth contour lines. Default: True."),
+    dpi: Optional[int] = typer.Option(None, "--dpi", help="DPI for mm² to px² conversion. Default: Auto or 96."),
+    # --- Blobbify Options ---
     blobbify: bool = typer.Option(False, "--blobbify", help="Split regions into smaller 'blobs'."),
     blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm² (if blobbify). Default: 3."),
     blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm² (if blobbify). Default: 30."),
     min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
-    interpolate_contours: bool = typer.Option(True, "--interpolate-contours/--no-interpolate-contours", help="Smooth contour lines. Default: True."),
-    dpi: Optional[int] = typer.Option(None, "--dpi", help="DPI for mm² to px² conversion (blobbify). Default: Auto or 96.")
 ):
     """
     Generates a paint-by-number set from an input image.
@@ -98,17 +107,14 @@ def pbn_cli(
     if not raster_only: expected_outputs.append("vector")
     output_paths = validate_output_dir(output_dir, overwrite=yes, expect=expected_outputs)
 
-    # Define paths for intermediate and final outputs
-    styled_path = output_dir / "styled_input.png" # If style is applied
-    bpp_quantized_input_path = output_dir / "bpp_quantized_input.png" # After --bpp pre-quantization
-    bpp_quantized_palette_path = output_dir / "bpp_quantized_palette_source.png" # If --palette-from and --bpp
-
-    quantized_pbn_path = output_paths["quantized"] # Final PBN quantized image (e.g., 12 colors)
+    styled_path = output_dir / "styled_input.png"
+    bpp_quantized_input_path = output_dir / "bpp_quantized_input.png"
+    bpp_quantized_palette_path = output_dir / "bpp_quantized_palette_source.png"
+    quantized_pbn_path = output_paths["quantized"]
     labeled_path = output_paths["raster"]
     legend_path = output_paths["legend"]
     vector_path = output_paths.get("vector")
 
-    # --- Determine effective PBN num_colors, font_size, tile_spacing ---
     effective_pbn_num_colors = num_colors
     effective_tile_spacing = tile_spacing
     effective_font_size = font_size
@@ -130,17 +136,25 @@ def pbn_cli(
     if effective_font_size is None: effective_font_size = 12
     typer.echo(f"Final PBN palette will aim for {effective_pbn_num_colors} colors.")
 
-    # --- Stage 0: Styling (if any) ---
     current_input_image_path_for_processing: Path = input_path
     if style:
         try:
-            stylize.apply_style(input_path, styled_path, style)
+            typer.echo(f"Applying style '{style}'...")
+            stylize.apply_style(
+                input_path, 
+                styled_path, 
+                style,
+                blur_radius=blur_radius, # Pass the CLI option value
+                pixelate_block_size=pixelate_block_size, # Pass the CLI option value
+                mosaic_block_size=mosaic_block_size # Pass the CLI option value
+            )
             current_input_image_path_for_processing = styled_path
-            typer.echo(f"Applied style '{style}', intermediate saved to: {styled_path}")
+            typer.echo(f"Styled image saved to: {styled_path}")
+        except ValueError as e: # Catch specific ValueErrors from stylize.py
+             typer.secho(f"Styling error: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
         except Exception as e:
-            typer.secho(f"Error applying style: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
+            typer.secho(f"Unexpected error applying style: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-    # --- Stage 1: BPP Pre-quantization (if --bpp is set) ---
     path_to_main_image_for_pbn_quantization: Path = current_input_image_path_for_processing
     path_to_palette_image_for_extraction: Optional[Path] = palette_from
 
@@ -151,7 +165,6 @@ def pbn_cli(
         num_bpp_quant_colors = 2**bpp
         typer.echo(f"Applying --bpp {bpp} pre-quantization ({num_bpp_quant_colors} colors)...")
 
-        # Pre-quantize main input image
         try:
             with Image.open(current_input_image_path_for_processing) as img_pil:
                 pre_quant_input_pil = quantize_pil_image(img_pil, num_bpp_quant_colors)
@@ -161,7 +174,6 @@ def pbn_cli(
         except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
             typer.secho(f"Error pre-quantizing input image {current_input_image_path_for_processing}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-        # Pre-quantize palette source image (if provided)
         if palette_from:
             try:
                 with Image.open(palette_from) as palette_img_pil:
@@ -172,8 +184,6 @@ def pbn_cli(
             except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
                 typer.secho(f"Error pre-quantizing palette source image {palette_from}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
     
-    # --- Stage 2: PBN Quantization ---
-    # Extract palette if --palette-from is used (from original or bpp-quantized source)
     fixed_pbn_palette_data = None
     if path_to_palette_image_for_extraction:
         try:
@@ -185,7 +195,6 @@ def pbn_cli(
         except Exception as e:
             typer.secho(f"Error extracting PBN palette from {path_to_palette_image_for_extraction}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-    # Perform final PBN quantization on the (potentially styled and/or bpp-quantized) main image
     try:
         final_pbn_palette = quantize.quantize_image(
             path_to_main_image_for_pbn_quantization, 
@@ -197,7 +206,6 @@ def pbn_cli(
     except Exception as e:
         typer.secho(f"Error during final PBN quantization of {path_to_main_image_for_pbn_quantization}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-    # --- Segmentation and Output Generation ---
     try:
         img_pil_for_segmentation = Image.open(quantized_pbn_path).convert("RGB")
         img_data_for_segmentation = np.array(img_pil_for_segmentation)
@@ -208,12 +216,9 @@ def pbn_cli(
         typer.secho(f"Error opening PBN quantized image {quantized_pbn_path}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
     primitives = segment.collect_region_primitives(
-        input_path=quantized_pbn_path,
-        palette=final_pbn_palette,
-        font_size=effective_font_size,
-        font_path=font_path,
-        tile_spacing=effective_tile_spacing,
-        label_mode=label_mode,
+        input_path=quantized_pbn_path, palette=final_pbn_palette,
+        font_size=effective_font_size, font_path=font_path,
+        tile_spacing=effective_tile_spacing, label_mode=label_mode,
         interpolate_contours=interpolate_contours
     )
     typer.echo(f"Collected {len(primitives)} initial regions for labeling.")
@@ -266,30 +271,27 @@ def pbn_cli(
         except Exception as e: typer.secho(f"Error generating legend: {e}", fg=typer.colors.RED)
 
     typer.secho("\nProcessing complete!", fg=typer.colors.GREEN)
-    typer.echo(f"All outputs are in directory: {output_dir.resolve()}")
+    if output_dir:
+        typer.echo(f"All outputs are in directory: {output_dir.resolve()}")
 
 
 def validate_output_dir(
     output_dir: Path, overwrite: bool = False, expect: Optional[list[str]] = None,
 ) -> dict[str, Path]:
     default_file_names = {
-        "quantized": "quantized_pbn.png", # Final PBN quantized image
+        "quantized": "quantized_pbn.png",
         "vector": "vector.svg",
         "legend": "legend.png",
         "raster": "labeled.png",
-        # Intermediate files that could be clobbered if not careful with naming
         "styled_input": "styled_input.png",
         "bpp_quantized_input": "bpp_quantized_input.png",
         "bpp_quantized_palette_source": "bpp_quantized_palette_source.png"
     }
-    
-    # Only check for final expected outputs for clobbering
     final_output_keys = ["quantized", "vector", "legend", "raster"]
     files_to_check_for_clobber: list[Path] = []
-
-    if expect: # expect should refer to keys in final_output_keys
+    if expect:
         for key in expect:
-            if key in default_file_names: # Ensure key is valid
+            if key in default_file_names:
                  files_to_check_for_clobber.append(output_dir / default_file_names[key])
     
     if not overwrite and files_to_check_for_clobber:
@@ -299,7 +301,6 @@ def validate_output_dir(
             for path_str in clobbered_files_found: typer.secho(f"  {path_str}", fg=typer.colors.RED)
             typer.secho("Use --yes (-y) to allow overwriting.", fg=typer.colors.YELLOW); raise typer.Exit(code=1)
 
-    # Return paths for all defined files, including intermediates, so CLI can use consistent names
     all_defined_output_paths = {key: output_dir / name for key, name in default_file_names.items()}
     return all_defined_output_paths
 
