@@ -324,7 +324,7 @@ PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is funct
 To take full advantage of GPU acceleration, I suggest installing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs there. 
 
 To get scikit-learn to use these accelerated functions you must run
-`load_ext cuml.accel` before running your PBNPy command-line. 
+`python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...` 
 
 Example:
 ``` bash
