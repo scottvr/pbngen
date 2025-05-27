@@ -29,12 +29,16 @@ pip install -r requirements.txt
 
 Dependencies:
 - `Pillow`
-- `typer[all]` (for rich tracebacks and shell completion, if desired)
+- `typer` 
 - `numpy`
 - `scikit-learn`
 - `scipy`
 - `scikit-image`
 - `rich` (for enhanced console output)
+
+Optional Dependencies:
+- `cupy`
+- `cuml` (see [section on GPU under WSL](#note-concerning-scikit-learn-(cuml)-gpu-acceleration-on-windows))
 
 ## Usage
 
