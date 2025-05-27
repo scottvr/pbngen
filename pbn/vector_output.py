@@ -15,7 +15,10 @@ def write_svg(
     # Optional debug box to visualize canvas bounds
     dwg.add(dwg.rect(insert=(0, 0), size=canvas_size, fill='white', stroke='gray', stroke_width=1))
 
-    color = "#66ccff"  # fixed light blue for PBN outlines and labels
+    color = "#88ddff"  # fixed light blue for PBN outlines and labels
+    # testing:
+    outline_color = "#88ddff"  
+    label_color = "#88ddff"
 
     for item in primitives:
         # Draw outlines
@@ -27,7 +30,7 @@ def write_svg(
             if filtered:
                 dwg.add(dwg.polyline(
                     points=filtered,
-                    stroke=color,
+                    stroke=outline_color,
                     fill="none",
                     stroke_width=1
                 ))
@@ -40,7 +43,8 @@ def write_svg(
             dwg.add(dwg.text(
                 label["value"],
                 insert=(int(x), int(y)),
-                fill=color,
+                fill=label_color,
+                stroke=label_color,
                 font_size=label["font_size"],
                 text_anchor="middle",
                 alignment_baseline="middle"

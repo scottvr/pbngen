@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image, UnidentifiedImageError, ImageOps 
 import re 
 from typing import Optional
+import traceback
 
 import rich.traceback 
 try:
@@ -97,6 +98,9 @@ def pbn_cli(
     num_colors: Optional[int] = typer.Option(
         None, "--num-colors", help="Final number of colors for the PBN palette. Default: 12."
     ),
+    dither: bool = typer.Option(
+        False, "--dither", help="Final number of colors for the PBN palette. Default: 12."
+    ),
     bpp: Optional[int] = typer.Option(
         None, "--bpp",
         help="Bits Per Pixel (1-8) for an initial color depth reduction. Applied before final PBN quantization."
@@ -125,9 +129,25 @@ def pbn_cli(
         None, "--blur-radius", min=1,
         help="Radius for 'blur' style. Default: 4"
     ),
-    edge_strength: Optional[int] = typer.Option(
-        None, "--edge-strength", min=0.1,
-        help="Strength of Edge Enhancement. Default: 0.5 (decimal percent)"
+    edge_strength: Optional[float] = typer.Option(
+        None, "--edge-strength", min=0.5,
+        help="floattrength of Edge Enhancement. Default: 0.5 (decimal percent)"
+    ),
+    intensity: Optional[float] = typer.Option(
+        None, "--test-intensity", min=0.1,
+        help="Strength of test filter effect. Default: 0.1 (decimal percent)"
+    ),
+    brush_size: Optional[int] = typer.Option(
+        None, "--brush-size", min=1,
+        help="diameter of elliptical \"brush\" used in pre-style filters (where applicable.)"
+    ),
+    brush_step: Optional[int] = typer.Option(
+        None, "--brush-step", min=2,
+        help="Size of difference in brush-sizes during successive test-filter passes."
+    ),
+    num_brushes: Optional[int] = typer.Option(
+        None, "--num-brushes", min=1,
+        help="number of test-filter passes (decreasing brush size by brush-step each iteration.)"
     ),
     pixelate_block_size: Optional[int] = typer.Option(
         None, "--pixelate-block-size", min=1,
@@ -224,7 +244,7 @@ def pbn_cli(
         try:
             typer.echo(f"Applying style '{style}'...")
             stylize.apply_style(input_path, styled_path, style, blur_radius=blur_radius, edge_strength=edge_strength,
-                                pixelate_block_size=pixelate_block_size, mosaic_block_size=mosaic_block_size)
+                                pixelate_block_size=pixelate_block_size, mosaic_block_size=mosaic_block_size, num_brushes=num_brushes, brush_size=brush_size, brush_step=brush_step, intensity=intensity)
             current_input_image_path_for_processing = styled_path
             typer.echo(f"Styled image saved to: {styled_path}")
         except ValueError as e: typer.secho(f"Styling error: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
@@ -301,9 +321,9 @@ def pbn_cli(
             typer.echo(f"Extracted {len(fixed_pbn_palette_data)} colors from '{path_to_palette_image_for_extraction}'.")
         except Exception as e: typer.secho(f"Error extracting PBN palette from {path_to_palette_image_for_extraction}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
     try:
-        final_pbn_palette = quantize.quantize_image(path_to_main_image_for_pbn_quantization, quantized_pbn_path, num_colors=effective_pbn_num_colors, fixed_palette=fixed_pbn_palette_data)
+        final_pbn_palette = quantize.quantize_image(path_to_main_image_for_pbn_quantization, quantized_pbn_path, num_colors=effective_pbn_num_colors, fixed_palette=fixed_pbn_palette_data, dither=dither)
         typer.echo(f"Final PBN quantized image to: {quantized_pbn_path} ({len(final_pbn_palette)} colors).")
-    except Exception as e: typer.secho(f"Error PBN quantization of {path_to_main_image_for_pbn_quantization}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
+    except Exception as e: typer.secho(f"Error PBN quantization of {path_to_main_image_for_pbn_quantization}: {traceback.print_tb(e.__traceback__)} {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
     canvas_size_for_final_output: tuple[int, int]
     try:
