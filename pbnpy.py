@@ -138,11 +138,15 @@ def pbn_cli(
     ),
     edge_strength: Optional[float] = typer.Option(
         None, "--edge-strength", min=0.5,
-        help="floattrength of Edge Enhancement. Default: 0.5 (decimal percent)"
+        help="Strength of Edge Enhancement. Default: 0.5 (decimal percent)"
     ),
-    intensity: Optional[float] = typer.Option(
-        None, "--test-intensity", min=0.1,
-        help="Strength of test filter effect. Default: 0.1 (decimal percent)"
+    focus: Optional[int] = typer.Option(
+        None, "--focus", min=1,
+        help="How \"tidy\" your brush strokes are. Lower is more painterly. (default: 1)"
+    ),
+    fervor: Optional[int] = typer.Option(
+        None, "--fervor", min=1,
+        help="How \"manic\" your brush strokes are. Higher is more intense. (default: 1)"
     ),
     brush_size: Optional[int] = typer.Option(
         None, "--brush-size", min=1,
@@ -252,11 +256,11 @@ def pbn_cli(
         try:
             typer.echo(f"Applying style '{style}'...")
             stylize.apply_style(input_path, styled_path, style, blur_radius=blur_radius, edge_strength=edge_strength,
-                                pixelate_block_size=pixelate_block_size, mosaic_block_size=mosaic_block_size, num_brushes=num_brushes, brush_size=brush_size, brush_step=brush_step, intensity=intensity)
+                                pixelate_block_size=pixelate_block_size, mosaic_block_size=mosaic_block_size, num_brushes=num_brushes, brush_size=brush_size, brush_step=brush_step, focus=focus)
             current_input_image_path_for_processing = styled_path
             typer.echo(f"Styled image saved to: {styled_path}")
-        except ValueError as e: typer.secho(f"Styling error: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
-        except Exception as e: typer.secho(f"Unexpected error applying style: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
+        except ValueError as e: typer.secho(f"Styling error: {traceback.print_tb(e.__traceback__)}  {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
+        except Exception as e: typer.secho(f"Unexpected error applying style: {traceback.print_tb(e.__traceback__)} {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
     path_to_main_image_for_canvas_scaling: Path = current_input_image_path_for_processing
     path_to_palette_image_for_extraction: Optional[Path] = palette_from

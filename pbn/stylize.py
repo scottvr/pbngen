@@ -1,10 +1,11 @@
-from PIL import Image, ImageFilter, ImageDraw, ImageEnhance
+from PIL import Image, ImageFilter, ImageDraw, ImageEnhance, ImageOps
 import numpy as np
 import random
 import os 
 import typer # for typer.echo
+import math
 
-def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, edge_strength=None, brush_size=None, intensity=None, brush_step=None,  num_brushes=None):
+def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, brush_step=None,  num_brushes=None, fervor=None, focus=None):
     """
     Applies a specified visual style to an input image and saves the output.
 
@@ -16,7 +17,7 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         pixelate_block_size (int, optional): Block size for "pixelate" style.
         mosaic_block_size (int, optional): Block size for "mosaic" style.
         brush_size:
-        intensity:
+        focus:
 
     Raises:
         ValueError: If the input file is not found, cannot be opened, or if an unknown style is specified.
@@ -146,29 +147,32 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
 
         # temp hardcode:
         actual_num_brushes = num_brushes if num_brushes is not None else 2
-        actual_num_brushes = min(actual_num_brushes, 3) # clamp to three brushes for now
+        actual_num_brushes = min(actual_num_brushes, 5) # clamp to five brushes for now
         actual_brush_size = brush_size if brush_size is not None else 3
+        actual_brush_step = brush_step if brush_step is not None else max(1, actual_brush_size // actual_num_brushes)
+        typer.echo(f"")
 
         enhancer = ImageEnhance.Contrast(image)
-        for idx in range(0, num_brushes):
-            bs = actual_brush_size - idx * brush_step
+        for idx in range(0, actual_num_brushes):
+            bsize = actual_brush_size - idx * actual_brush_step
             actual_blur_radius = blur_radius if blur_radius is not None else 4
-            intensity = intensity if intensity is not None else 1
-            image = enhancer.enhance(1.2)  # Increase contrast by 50%
+            focus = focus if focus is not None else 1
+            image = Image.fromarray(image_array)
+            image = enhancer.enhance(1.1)  # Increase contrast by 10%
             image = image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
-    
-            for _ in range(w * h // (actual_brush_size**2) * int(intensity)):
+            typer.echo(f"Using #{bsize} brush ({idx+1}/{actual_num_brushes}).")
+            for _ in range(w * h // (bsize**2) * int(focus)):
                 x = random.randint(0, w - 1)
                 y = random.randint(0, h - 1)
     
                 # Get the color of the pixel
                 r, g, b = image.getpixel((x, y))
                 # Apply brush strokes around the pixel
-                for i in range(max(0, x - actual_brush_size // 2), min(w, x + actual_brush_size // 2 + 1)):
-                    for j in range(max(0, y - actual_brush_size // 2), min(h, y + actual_brush_size // 2 + 1)):
+                for i in range(max(0, x - bsize // 2), min(w, x + bsize // 2 + 1)):
+                    for j in range(max(0, y - bsize // 2), min(h, y + bsize // 2 + 1)):
                         dx = i - x
                         dy = j - y
-                        if dx**2 + dy**2 <= (actual_brush_size // 2)**2:
+                        if dx**2 + dy**2 <= (bsize // 2)**2:
                             # Calculate new color values with random variation
                             new_r_float = r + random.uniform(-20, 20)
                             new_g_float = g + random.uniform(-20, 20)
@@ -180,11 +184,12 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
                             clamped_b = max(0, min(255, int(new_b_float)))
                             
                             # Assign the clamped color tuple
-                            # Assuming you've made the fix image_array[j, i]
                             image_array[j, i] = (clamped_r, clamped_g, clamped_b)        
+            typer.echo(f"{i*j} strokes.")
         styled_image = Image.fromarray(image_array)
-        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
-        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
+#        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+#        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=2))
+        styled_image = ImageOps.posterize(styled_image, 4)
         styled_image.save(output_path)
 
     elif style=="test2":
@@ -195,13 +200,11 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         initial_brush_diameter = brush_size if brush_size is not None else max(5, min(w,h) // 40) # Larger initial brush
         brush_diameter_step = brush_step if brush_step is not None else max(1, initial_brush_diameter // 3) # How much brush shrinks
         base_blur_radius = blur_radius if blur_radius is not None else 3 # Blur for color sampling
-        stroke_intensity_factor = intensity if intensity is not None else 1 # Multiplier for number of strokes
+        stroke_fervor = fervor if fervor is not None else 1 # Multiplier for number of strokes
 
         # Create the canvas to paint on. Start with original image or a flat color?
         # For painterly effect, often good to paint onto a copy of the slightly blurred original,
         # or build up from a blank/toned canvas.
-        # Your current code paints on image_array, which is the original unblurred image.
-        # Let's make a new output array initialized perhaps with a base color or copy of original.
         output_image_array = np.array(image.convert("RGB")) # Start with a copy of the original as a base
 
         # Prepare a source image for color picking - this might be blurred/enhanced differently
@@ -221,7 +224,7 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
             
             # Determine number of strokes for this pass
             # More strokes for smaller brushes can add detail, or keep density similar
-            num_strokes = (w * h // (current_brush_diameter**2)) * stroke_intensity_factor
+            num_strokes = (w * h // (current_brush_diameter**2)) * stroke_fervor
             # Ensure num_strokes is an int if used in range()
             num_strokes = max(10, int(num_strokes)) # Ensure a minimum number of strokes
 
@@ -287,7 +290,7 @@ if __name__ == '__main__':
         print("Applying impressionist style (default blur)...")
         apply_style("dummy_input.png", "test_outputs/styled_impressionist_default_blur.png", "impressionist")
         print("Applying test-filter style (default blur)...")
-        apply_style("dummy_input.png", "test_outputs/styled_testfilter.png", "test", intensity=1.5, num_brushes=2, brush_size=16, brush_step=8, blur_radius=3)
+        apply_style("dummy_input.png", "test_outputs/styled_testfilter.png", "test", focus=1.5, num_brushes=2, brush_size=16, brush_step=8, blur_radius=3)
         
         print(f"Example styled images saved in '{os.path.abspath('test_outputs')}' directory.")
         print(f"Dummy input 'dummy_input.png' created in current directory: {os.path.abspath('.')}")
