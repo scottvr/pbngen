@@ -110,6 +110,8 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 - Please read the documentation to the end and try a few settings before opening an Issue
 - If it really seems that pbnpy is failing to make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
 
+-----
+
 ## Options
 
 | Flag                          | Description                                                                                                                               | Default        |
@@ -214,6 +216,8 @@ First, select a style with `--style <style_name>`, then optionally add its corre
     ```
 
 If you specify a style parameter flag (e.g., `--blur-radius`) without the corresponding `--style` flag (e.g., `--style blur`), the parameter flag will be ignored as no style is being applied. The parameter flags are only active when their associated style is selected.
+
+------
 
 ### Specifying Physical Canvas Size for Printing (`--canvas-size`)
 
