@@ -335,6 +335,10 @@ $ python pbnpy.py inputimage.png ./output_dir
 
 Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers.
 
+In short you will need the NVIDIA **Windows** driver, WSL2 working on your Windows machine, and basic Linux knowledge for the distro you installed in WSL2.
+
+- [CUDA in WLS2 User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+- [Installing RAPIDS under WSL2](https://docs.rapids.ai/install/#wsl2)
 
 
 ## License

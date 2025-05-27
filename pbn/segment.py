@@ -346,22 +346,81 @@ def resolve_label_collisions(
 # --- Other existing functions (find_stable_label_pixel, interpolate_contour, render_raster_from_primitives, blobbify_region) ---
 # These are assumed to be mostly correct from your provided file, with minor corrections below if needed.
 
-def find_stable_label_pixel(region_mask): # (Assumed correct from your file)
+def find_stable_label_pixel(region_mask: xp.ndarray) -> tuple[int, int]:
+    """
+    Finds a 'stable' pixel within the True regions of the input mask.
+    A stable pixel is one that has a maximal product of contiguous True pixels
+    in the four cardinal directions (left, right, up, down), excluding itself.
+    This version is optimized for GPU (CuPy) if available, otherwise uses NumPy.
+    """
     h, w = region_mask.shape
-    best_score, best_coord = -1, (0, 0)
-    def same_count(x, y, dx, dy):
-        count = -1
-        while 0 <= x < w and 0 <= y < h and region_mask[y, x]:
-            count += 1; x += dx; y += dy
-        return count
-    ys, xs = xp.nonzero(region_mask)
-    if not ys.size: return (w//2, h//2) # Fallback for empty mask
-    for x, y in zip(xs, ys):
-        score = (same_count(x, y, -1, 0) * same_count(x, y, 1, 0) *
-                 same_count(x, y, 0, -1) * same_count(x, y, 0, 1))
-        if score > best_score:
-            best_score = score; best_coord = (x, y)
-    return best_coord
+
+    if xp.sum(region_mask) == 0:
+        # No True pixels in the mask, return center of mask as fallback (x, y)
+        return (w // 2, h // 2)
+
+    # Helper function to calculate run lengths along rows (left-to-right)
+    # For each '1', it counts how many consecutive '1's are to its right (inclusive).
+    def _scan_runs_rowwise_left_to_right(matrix_rows: xp.ndarray) -> xp.ndarray:
+        m, n = matrix_rows.shape # m = number of rows, n = length of rows
+        counts = xp.zeros_like(matrix_rows, dtype=int)
+        
+        if n == 0: # Handle case where rows have zero length
+            return counts
+        
+        # Ensure input is integer for accumulation logic (True becomes 1, False 0)
+        current_matrix_int = matrix_rows.astype(int)
+        
+        # Initialize the last column: count is 1 if mask is 1, else 0.
+        counts[:, n-1] = current_matrix_int[:, n-1]
+        
+        # Iterate from the second to last column down to the first
+        for i in range(n-2, -1, -1):
+            # Pixels in current column i that are '1' (as boolean)
+            is_one_in_current_col = current_matrix_int[:, i].astype(bool)
+            # If matrix_rows[r, i] is 1, count is 1 + count from matrix_rows[r, i+1].
+            # If matrix_rows[r, i] is 0, count is 0.
+            # The multiplication by is_one_in_current_col achieves the conditional reset.
+            counts[:, i] = (counts[:, i+1] + 1) * is_one_in_current_col
+        return counts
+
+    # --- Calculate run lengths (C_dir) in four directions ---
+    # These are total lengths including the current pixel if it's 1.
+
+    # Counts_right (C_r)
+    counts_r = _scan_runs_rowwise_left_to_right(region_mask)
+
+    # Counts_left (C_l)
+    counts_l = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(region_mask)))
+
+    # Counts_down (C_d)
+    mask_T = region_mask.T
+    counts_d = _scan_runs_rowwise_left_to_right(mask_T).T
+
+    # Counts_up (C_u)
+    # This is equivalent to calculating "counts_left" on the transposed mask
+    counts_u = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(mask_T))).T
+    
+    # --- Calculate scores based on original logic ---
+    # Original logic: score = product of (count of *additional* neighbors in each direction, c_dir)
+    # c_dir = C_dir - 1. These values must be >= 0.
+    score_val_r = xp.maximum(0, counts_r - 1)
+    score_val_l = xp.maximum(0, counts_l - 1)
+    score_val_d = xp.maximum(0, counts_d - 1)
+    score_val_u = xp.maximum(0, counts_u - 1)
+
+    scores = score_val_r * score_val_l * score_val_d * score_val_u
+    # Scores will be 0 where region_mask is 0, because for such pixels,
+    # C_dir would be 0, making C_dir - 1 negative, then max(0, negative) = 0.
+
+    # Find the flat index of the first occurrence of the maximum score
+    flat_idx = xp.argmax(scores)
+    
+    # Convert flat index to 2D coordinates (row, col) which is (y, x)
+    best_y_xp, best_x_xp = xp.unravel_index(flat_idx, scores.shape)
+
+    # Return as (x, y) tuple of Python ints
+    return (int(best_x_xp.item()), int(best_y_xp.item()))
 
 def interpolate_contour(contour, step=0.5): # (Assumed correct from your file)
     dense = [];
