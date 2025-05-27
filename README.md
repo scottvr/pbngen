@@ -8,7 +8,7 @@
 - Two-stage color quantization:
     - Optional initial global color reduction using Bits Per Pixel (`--bpp`).
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
-- Style preprocessing: `blur`, `pixelate`, `mosaic`.
+- Style preprocessing: `blur`, `pixelate`, `mosaic`, and a poorly-named `"impressionist"` filter.
 - Complexity presets for beginner to master-level detail.
 - Label placement strategies: `diagonal`, `centroid`, `stable`.
 - Custom font support for overlays and legend.
