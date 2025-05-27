@@ -1,5 +1,5 @@
 import typer
-from pbn import quantize, segment, legend, stylize, palette_tools, vector_output
+from pbn import quantize, segment, legend, stylize, palette_tools, vector_output, file_utils
 import os
 from pathlib import Path
 import numpy as np
@@ -12,7 +12,6 @@ import rich.traceback
 try:
     import cupy as xp
     import cupyx.scipy.ndimage as ndi_xp
-    # You might want a more robust check for actual GPU availability
     if xp.cuda.is_available():
         print("CuPy found, using GPU.")
         GPU_ENABLED = True
@@ -23,6 +22,21 @@ except ImportError:
     import numpy as xp
     import scipy.ndimage as ndi_xp
     GPU_ENABLED = False
+
+from enum import Enum
+
+class PBNFile(Enum):
+    # Final Outputs
+    VECTOR_OUTPUT = "vector_output"     # SVG paint-by-number guide
+    RASTER_OUTPUT = "raster_output"     # PNG paint-by-number guide (labeled)
+    QUANTIZED_GUIDE = "quantized_guide" # Main PBN color-blocked image
+    PALETTE_LEGEND = "palette_legend"   # Color legend
+
+    # Intermediate/Cruft Files
+    STYLED_INPUT = "styled_input"
+    BPP_QUANTIZED_INPUT = "bpp_quantized_input"
+    BPP_QUANTIZED_PALETTE_INPUT = "bpp_quantized_palette_input"
+    CANVAS_SCALED_INPUT = "canvas_scaled_input"
 
 def quantize_pil_image(image_pil: Image.Image, num_quant_colors: int, method=Image.Quantize.MEDIANCUT) -> Image.Image:
     if image_pil.mode not in ('P', 'L'):
@@ -57,26 +71,19 @@ def parse_canvas_size_to_pixels(size_str: str, dpi: float) -> Optional[tuple[int
 def validate_output_dir(
     output_dir: Path, overwrite: bool = False, expect: Optional[list[str]] = None,
 ) -> dict[str, Path]:
-    default_file_names = {
-        "quantized": "quantized_pbn.png", 
-        "vector": "vector.svg", "legend": "legend.png", "raster": "labeled.png",
-        "styled_input": "styled_input.png", "bpp_quantized_input": "bpp_quantized_input.png",
-        "bpp_quantized_palette_source": "bpp_quantized_palette_source.png",
-        "canvas_scaled_input": "canvas_scaled_input.png" 
-    }
-    final_output_keys_to_check = ["quantized", "vector", "legend", "raster"] 
+    final_output_keys_to_check = ["quantized_guide", "vector_output", "palette_legend", "raster_output"] 
     files_to_check_for_clobber: list[Path] = []
     if expect: 
         for key in expect:
-            if key in default_file_names and key in final_output_keys_to_check:
-                 files_to_check_for_clobber.append(output_dir / default_file_names[key])
+            if key in file_utils.default_file_names and key in final_output_keys_to_check:
+                 files_to_check_for_clobber.append(output_dir / file_utils.default_file_names[key])
     if not overwrite and files_to_check_for_clobber:
         clobbered_files_found = [str(p) for p in files_to_check_for_clobber if p.exists()]
         if clobbered_files_found:
             typer.secho("Error: Files already exist:", fg=typer.colors.RED)
             for path_str in clobbered_files_found: typer.secho(f"  {path_str}", fg=typer.colors.RED)
             typer.secho("Use --yes (-y) to overwrite.", fg=typer.colors.YELLOW); raise typer.Exit(code=1)
-    return {key: output_dir / name for key, name in default_file_names.items()}
+    return {key: output_dir / name for key, name in file_utils.default_file_names.items()}
 
 def pbn_cli(
     input_path: Path = typer.Argument(
@@ -181,6 +188,7 @@ def pbn_cli(
     blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm². Default: 3."),
     blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm². Default: 30."),
     min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
+    # --- Extra/Output Options ---
     no_cruft: bool = typer.Option(
         False, "--no-cruft",
         help="Delete intermediate byproduct files (e.g., styled_input.png, canvas_scaled_input.png) upon completion."
@@ -195,18 +203,18 @@ def pbn_cli(
     except Exception as e:
         typer.secho(f"Error creating output directory {output_dir}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
-    expected_outputs = ["quantized", "raster", "legend"]
-    if not raster_only: expected_outputs.append("vector")
+    expected_outputs = ["quantized_guide", "raster_output", "palette_legend"]
+    if not raster_only: expected_outputs.append("vector_output")
     output_paths = validate_output_dir(output_dir, overwrite=yes, expect=expected_outputs)
 
     styled_path = output_paths["styled_input"]
     bpp_quantized_input_path = output_paths["bpp_quantized_input"]
-    bpp_quantized_palette_path = output_paths["bpp_quantized_palette_source"]
+    bpp_quantized_palette_path = output_paths["bpp_quantized_palette_input"]
     canvas_scaled_input_path = output_paths["canvas_scaled_input"] 
-    quantized_pbn_path = output_paths["quantized"] 
-    labeled_path = output_paths["raster"]
-    legend_path = output_paths["legend"]
-    vector_path = output_paths.get("vector")
+    quantized_pbn_path = output_paths["quantized_guide"] 
+    labeled_path = output_paths["raster_output"]
+    legend_path = output_paths["palette_legend"]
+    vector_path = output_paths.get("vector_output")
 
     effective_pbn_num_colors = num_colors
     effective_tile_spacing = tile_spacing
