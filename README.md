@@ -10,7 +10,7 @@
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
 - Style preprocessing: `blur`, `pixelate`, `mosaic`.
 - Complexity presets for beginner to master-level detail.
-- Label placement modes: `diagonal`, `centroid`, `stable`.
+- Label placement strategies: `diagonal`, `centroid`, `stable`.
 - Custom font support for overlays and legend.
 - Vector (SVG) and raster (PNG) output.
 - Optional fixed-palette matching from a source image (can also be pre-quantized with `--bpp`).
@@ -51,6 +51,8 @@ python pbnpy.py [OPTIONS] INPUT_FILE OUTPUT_DIRECTORY
 python pbnpy.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
+
+See [Tips for Best Results](#tips-for-best-results) further down in this README.
 
 ### More Complex Example
 
@@ -93,7 +95,9 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/bpp_quantized_input.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
     - `out/bpp_quantized_palette_source.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
-## Tips for Best Results!
+ **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.i**
+
+## Tips for Best Results
 
 - for complex images, `--style blur` almost always helps a ton.
 - for simple, clean low-color images (like logos) don't blur first

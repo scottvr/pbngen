@@ -119,11 +119,15 @@ def pbn_cli(
     ),
     # --- Style Options ---
     style: Optional[str] = typer.Option(
-        None, "--style", help="Optional style: blur, pixelate, mosaic."
+        None, "--style", help="Optional style: blur, pixelate, mosaic, impressionist."
     ),
     blur_radius: Optional[int] = typer.Option(
         None, "--blur-radius", min=1,
-        help="Radius for 'blur' style. Default: 4 (stylize module)."
+        help="Radius for 'blur' style. Default: 4"
+    ),
+    edge_strength: Optional[int] = typer.Option(
+        None, "--edge-strength", min=0.1,
+        help="Strength of Edge Enhancement. Default: 0.5 (decimal percent)"
     ),
     pixelate_block_size: Optional[int] = typer.Option(
         None, "--pixelate-block-size", min=1,
@@ -155,8 +159,12 @@ def pbn_cli(
     # --- Blobbify Options ---
     blobbify: bool = typer.Option(False, "--blobbify", help="Split regions into 'blobs'."),
     blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm². Default: 3."),
-    blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm². Default: 30.")
-    #min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
+    blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm². Default: 30."),
+    min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
+    no_cruft: bool = typer.Option(
+        False, "--no-cruft",
+        help="Delete intermediate byproduct files (e.g., styled_input.png, canvas_scaled_input.png) upon completion."
+    ),
 ):
     """
     Generates a paint-by-number set from an input image.
@@ -215,7 +223,7 @@ def pbn_cli(
     if style:
         try:
             typer.echo(f"Applying style '{style}'...")
-            stylize.apply_style(input_path, styled_path, style, blur_radius=blur_radius,
+            stylize.apply_style(input_path, styled_path, style, blur_radius=blur_radius, edge_strength=edge_strength,
                                 pixelate_block_size=pixelate_block_size, mosaic_block_size=mosaic_block_size)
             current_input_image_path_for_processing = styled_path
             typer.echo(f"Styled image saved to: {styled_path}")
@@ -364,6 +372,30 @@ def pbn_cli(
         try: legend.generate_legend(final_pbn_palette, legend_path, font_path, effective_font_size, swatch_size, 10); typer.echo(f"Legend: {legend_path}")
         except Exception as e: typer.secho(f"Error legend: {e}", fg=typer.colors.RED)
     typer.secho("\nProcessing complete!", fg=typer.colors.GREEN)
+
+    if no_cruft:
+        typer.echo("\n--no-cruft active: Cleaning up intermediate files...")
+        # Files identified as "cruft" based on the README and their intermediate nature
+        cruft_file_keys = [
+            "styled_input",                 # byproduct of --style
+            "bpp_quantized_input",          # byproduct of --bpp
+            "bpp_quantized_palette_source", # byproduct of --bpp and --palette-from
+            "canvas_scaled_input"           # byproduct of --canvas-size
+        ]
+        deleted_any_cruft = False
+        for key in cruft_file_keys:
+            file_path_to_delete = output_paths.get(key)
+            if file_path_to_delete and file_path_to_delete.exists():
+                try:
+                    file_path_to_delete.unlink()
+                    typer.echo(f"  Deleted: {file_path_to_delete.name}")
+                    deleted_any_cruft = True
+                except OSError as e:
+                    typer.secho(f"  Error deleting {file_path_to_delete.name}: {e}", fg=typer.colors.RED)
+        
+        if not deleted_any_cruft:
+            typer.echo("  No intermediate byproduct files were found or deleted.")
+
     if output_dir: typer.echo(f"Outputs in: {output_dir.resolve()}")
 
 if __name__ == "__main__":
