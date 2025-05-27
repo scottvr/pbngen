@@ -27,19 +27,7 @@ pip install -r requirements.txt
 
 **note: if using GPU, please ensure you have CUDA correctly configured and you will need to `pip install cupy` if it isn't already in your environment.**
 
-Dependencies:
-- `Pillow`
-- `typer` 
-- `numpy`
-- `scikit-learn`
-- `scipy`
-- `scikit-image`
-- `rich` (for enhanced console output)
-
-Optional Dependencies:
-- `cupy`
-- `cuml` (see [section on GPU under WSL](#note-concerning-scikit-learn-(cuml)-gpu-acceleration-on-windows))
-
+see [section on GPU under WSL](#note-concerning-scikit-learn-cuml-gpu-acceleration-on-windows)
 ## Usage
 
 The script is invoked directly, followed by options, the input image file, and the output directory.
