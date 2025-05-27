@@ -5,7 +5,7 @@
 ## Features
 
 - Converts any image into paint-by-number format.
-- **Two-stage color quantization:**
+- Two-stage color quantization:
     - Optional initial global color reduction using Bits Per Pixel (`--bpp`).
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
 - Style preprocessing: `blur`, `pixelate`, `mosaic`.
