@@ -655,8 +655,8 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
 def collect_region_primitives(
         input_path, palette, font_size=None, font_path=None, tile_spacing=None,
         min_region_area=50,
-        label_mode="diagonal",
-        small_region_label_mode="stable", # For small region fallback strategy
+        label_strategy="diagonal",
+        small_region_label_strategy="stable", # For small region fallback strategy
         additional_nudge_pixels_up=0, # For consistent label rendering and bbox calculation
         interpolate_contours=True
         ):
@@ -802,18 +802,18 @@ def collect_region_primitives(
             use_fallback_strategy = (region_width < local_spacing_for_diagonal or 
                                    region_height < local_spacing_for_diagonal)
             
-            current_label_mode = label_mode
+            current_label_strategy = label_strategy
             if use_fallback_strategy:
-                current_label_mode = small_region_label_mode
+                current_label_strategy = small_region_label_strategy
 
-            if current_label_mode == "stable":
+            if current_label_strategy == "stable":
                 # find_stable_label_pixel is already optimized to use xp (GPU/CPU)
                 sx_local, sy_local = find_stable_label_pixel(region_mask) # Uses xp array
                 labels = [make_label(sx_local, sy_local, idx, local_font_size, region_area=region_props.area)]
-            elif current_label_mode == "centroid":
+            elif current_label_strategy == "centroid":
                 cy_global, cx_global = int(region_props.centroid[0]), int(region_props.centroid[1])
                 labels = [make_label(cx_global, cy_global, idx, local_font_size, region_area=region_props.area)]
-            elif current_label_mode == "diagonal":
+            elif current_label_strategy == "diagonal":
                 row_is_offset = False
                 for y_coord in range(minr, maxr, local_spacing_for_diagonal):
                     current_x_offset = local_spacing_for_diagonal // 2 if row_is_offset else 0
@@ -823,7 +823,7 @@ def collect_region_primitives(
                         if region_mask[y_coord, actual_x_coord]: # Check on xp array
                             labels.append(make_label(actual_x_coord, y_coord, idx, local_font_size, region_area=region_props.area))
                     row_is_offset = not row_is_offset
-            elif current_label_mode == "none":
+            elif current_label_strategy == "none":
                 labels = []
 
             # --- Elision Logic --- (Your existing elision logic)
