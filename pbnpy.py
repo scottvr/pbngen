@@ -8,6 +8,20 @@ import re
 from typing import Optional
 
 import rich.traceback 
+try:
+    import cupy as xp
+    import cupyx.scipy.ndimage as ndi_xp
+    # You might want a more robust check for actual GPU availability
+    if xp.cuda.is_available():
+        print("CuPy found, using GPU.")
+        GPU_ENABLED = True
+    else:
+        raise ImportError("CuPy found but CUDA not available")
+except ImportError:
+    print("CuPy not found or not usable, falling back to NumPy/SciPy for CPU.")
+    import numpy as xp
+    import scipy.ndimage as ndi_xp
+    GPU_ENABLED = False
 
 def quantize_pil_image(image_pil: Image.Image, num_quant_colors: int, method=Image.Quantize.MEDIANCUT) -> Image.Image:
     if image_pil.mode not in ('P', 'L'):
@@ -99,7 +113,7 @@ def pbn_cli(
         None, "--dpi", 
         help="Target Dots Per Inch for --canvas-size and --blobbify. Default: Image metadata or 96."
     ),
-    min_region_area_cli: Optional[int] = typer.Option( # New CLI option
+    min_region_area_cli: Optional[int] = typer.Option( 
         None, "--min-region-area", min=1,
         help="Minimum pixel area for a color region to be processed and labeled. Default: 50 (from segment module)."
     ),
@@ -140,8 +154,8 @@ def pbn_cli(
     interpolate_contours: bool = typer.Option(True, "--interpolate-contours/--no-interpolate-contours", help="Smooth contour lines. Default: True."),
     # --- Blobbify Options ---
     blobbify: bool = typer.Option(False, "--blobbify", help="Split regions into 'blobs'."),
-    blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm². Default: 3."),
-    blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm². Default: 30.")
+    blob_min: int = typer.Option(30, "--blob-min", help="Min blob area in mm². Default: 3."),
+    blob_max: int = typer.Option(300, "--blob-max", help="Max blob area in mm². Default: 30.")
     #min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
 ):
     """
@@ -286,7 +300,7 @@ def pbn_cli(
     canvas_size_for_final_output: tuple[int, int]
     try:
         img_pil_for_segmentation = Image.open(quantized_pbn_path).convert("RGB")
-        img_data_for_segmentation = np.array(img_pil_for_segmentation)
+        img_data_for_segmentation = xp.array(img_pil_for_segmentation)
         canvas_size_for_final_output = img_pil_for_segmentation.size
         if canvas_size_str: # output_canvas_dimensions_px would have been set if canvas_size_str was true
             if output_canvas_dimensions_px != canvas_size_for_final_output:

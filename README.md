@@ -15,6 +15,7 @@
 - Vector (SVG) and raster (PNG) output.
 - Optional fixed-palette matching from a source image (can also be pre-quantized with `--bpp`).
 - Fully command-line driven with rich configuration.
+- GPU (Nvidia CUDA) support!
 
 ## Installation
 
@@ -23,6 +24,8 @@ Requires Python 3.7+
 ```bash
 pip install -r requirements.txt
 ```
+
+**note: if using GPU, please ensure you have CUDA correctly configured and you will need to `pip install cupy` if it isn't already in your environment.**
 
 Dependencies:
 - `Pillow`
@@ -308,6 +311,31 @@ python pbnpy.py "landscape.png" "./landscape_pbn_blobs" \
   --yes
 ```
 This generates a PBN for `landscape.png` with 20 final colors, where regions are blobbified into sizes roughly between 4mm² and 25mm² (calculated at 150 DPI), and labels use Comic Sans with a minimum size of 9pt.
+
+## GPU Support
+
+As already mentioned, you need to have a working CUDA installation, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of size (or output canvas size) you may find that the CPU-only version is just painfully slow.
+
+This link will help you get it set up if it isn't already: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
+
+PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
+
+To take full advantage of GPU acceleration, I suggest installing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs there. 
+
+To get scikit-learn to use these accelerated functions you must run
+`load_ext cuml.accel` before running your PBNPy command-line. 
+
+Example:
+``` bash
+$ load_ext cuml.accel
+$ python pbnpy.py inputimage.png ./output_dir
+```
+
+### Note Concerning scikit-learn GPU Acceleration on Windows
+
+Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers.
+
+
 
 ## License
 

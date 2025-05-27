@@ -5,9 +5,197 @@ import numpy as np
 import os
 import typer
 import random
-from scipy import ndimage as ndi # Added for blobbify_primitives
+from skimage.segmentation import watershed
+from skimage.feature import peak_local_max
+try:
+    import cupy as xp
+    import cupyx.scipy.ndimage as ndi_xp
+    # You might want a more robust check for actual GPU availability
+    if xp.cuda.is_available():
+        print("CuPy found, using GPU.")
+        GPU_ENABLED = True
+    else:
+        raise ImportError("CuPy found but CUDA not available")
+except ImportError:
+    print("CuPy not found or not usable, falling back to NumPy/SciPy for CPU.")
+    import numpy as xp
+    import scipy.ndimage as ndi_xp
+    GPU_ENABLED = False
 
-# --- make_label (already correctly updated by you) ---
+def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: int) -> list[xp.ndarray]:
+    """
+    Breaks down a large binary region mask into smaller "blob" masks.
+    Attempts to split components larger than max_blob_area using watershed segmentation.
+    The min_blob_area is a guideline; subsequent merging logic in the main
+    blobbify_primitives function handles blobs that are too small.
+
+    Args:
+        region_mask (np.ndarray): Binary mask of the region to blobbify.
+                                  Expected to be 2D.
+        min_blob_area (int): Minimum desired area for a blob. This is more of a
+                             hint for splitting logic if needed, as final merging
+                             handles small blobs.
+        max_blob_area (int): Maximum desired area for a blob. Components larger
+                             than this will be candidates for splitting.
+
+    Returns:
+        list[np.ndarray]: A list of 2D numpy arrays, where each array is a
+                          binary mask for a resulting blob. These masks are
+                          full-sized (same shape as input region_mask).
+    """
+    if not xp.any(region_mask):
+        return []
+
+    output_blob_masks = []
+    
+    # Queue will hold full-sized masks that need processing.
+    # Each item in the queue is a binary mask of a component.
+    processing_queue = []
+
+    # Initial connected components in the input region_mask.
+    # These are the starting candidates for blobs or for splitting.
+
+    if xp.__name__ == 'cupy':
+        numpy_region_mask_for_sklabel = xp.asnumpy(region_mask)
+    else:
+        numpy_region_mask_for_sklabel = region_mask # It's already a NumPy array
+
+    # sklabel takes NumPy array, returns NumPy array
+    numpy_labeled_array = sklabel(numpy_region_mask_for_sklabel, connectivity=1, background=0)
+
+    # Convert the result to an xp array (CuPy if GPU_ENABLED)
+    labeled_initial_components = xp.asarray(numpy_labeled_array)
+
+    if xp.__name__ == 'cupy':
+        numpy_labeled_for_props = xp.asnumpy(labeled_initial_components)
+    else:
+        numpy_labeled_for_props = labeled_initial_components # It's already NumPy
+    props_initial_components = regionprops(numpy_labeled_for_props)
+
+    for props in props_initial_components:
+        if props.area > 0:
+            # Create a full-size mask for this component
+            component_mask = (labeled_initial_components == props.label).astype(xp.uint8)
+            #if xp.__name__ == 'cupy': 
+            #   component_mask = xp.asnumpy(component_mask.get())
+
+            processing_queue.append(component_mask)
+
+    while processing_queue:
+        current_mask = processing_queue.pop(0)
+        current_area = xp.sum(current_mask)
+
+        if current_area == 0:
+            continue
+
+        if current_area <= max_blob_area:
+            # If it's small enough (or became small enough after a split), add it.
+            # Blobs smaller than min_blob_area are handled by merging logic
+            # in the calling function (blobbify_primitives).
+            output_blob_masks.append(current_mask)
+        else:
+            if xp.__name__ == 'cupy':
+                print(f"DEBUG: current_mask.device = {current_mask.device}")
+            # Component is too large, attempt to split using watershed
+            distance = ndi_xp.distance_transform_edt(current_mask)
+            
+            # Heuristic for min_distance for peak_local_max.
+            # Aim for blobs that are roughly circular/square with an area around max_blob_area.
+            # The characteristic length would be sqrt(max_blob_area).
+            # min_distance between peaks could be a fraction of this length.
+            min_dist_for_peaks = max(3, int(xp.sqrt(max_blob_area) / 3.0))
+
+            # Calculate how many blobs we might roughly expect
+            num_desired_blobs = max(2, int(xp.ceil(current_area / max_blob_area)))
+
+            if xp.__name__ == 'cupy': # Or your GPU_ENABLED flag
+                distance_for_peak_local_max = xp.asnumpy(distance)
+                labels_for_peak_local_max = xp.asnumpy(current_mask)
+            else: # xp is numpy
+                distance_for_peak_local_max = distance
+                labels_for_peak_local_max = current_mask
+
+            local_maxi_coords = peak_local_max(
+                distance_for_peak_local_max,
+                min_distance=min_dist_for_peaks,
+                labels=labels_for_peak_local_max, # Process peaks only within the current_mask
+                                     # current_mask acts as label image 1 here.
+                num_peaks=num_desired_blobs * 2 # Find more peaks than strictly needed as a buffer
+            )
+
+            local_maxi_coords = xp.asarray(local_maxi_coords)
+
+            if local_maxi_coords.shape[0] < 2:
+                # Not enough distinct peaks for watershed to perform a meaningful split.
+                # Add the current large mask as is; it couldn't be split by this method.
+                output_blob_masks.append(current_mask)
+                continue
+
+            markers_bool_mask = xp.zeros(distance.shape, dtype=bool)
+            markers_bool_mask[tuple(local_maxi_coords.T)] = True
+            markers_labeled, num_marker_features = ndi_xp.label(markers_bool_mask)
+
+            if num_marker_features < 2 :
+                # After labeling markers, still effectively one marker region.
+                output_blob_masks.append(current_mask)
+                continue
+
+            # Ensure -distance, markers_labeled, and current_mask are NumPy arrays for skimage.watershed
+            # ... inside blobbify_region, before watershed call
+            # Assume -distance, markers_labeled, current_mask are xp arrays (CuPy if GPU_ENABLED)
+           
+            if xp.__name__ == 'cupy':
+                print("DEBUG: GPU path for watershed conversion")
+                # Correct way to convert CuPy arrays to NumPy arrays
+                image_for_watershed_np = xp.asnumpy(-distance)
+                markers_for_watershed_np = xp.asnumpy(markers_labeled)
+                mask_for_watershed_np = xp.asnumpy(current_mask)
+            else: # xp is numpy
+                print("DEBUG: CPU path for watershed conversion")
+                image_for_watershed_np = -distance
+                markers_for_watershed_np = markers_labeled
+                mask_for_watershed_np = current_mask
+            # Debug prints to verify types RIGHT BEFORE the watershed call
+            print(f"DEBUG: About to call watershed. Types are:")
+           
+            connectivity_val = 1 # Or whatever your connectivity is
+          
+            # Call watershed with the (now hopefully) NumPy arrays
+            watershed_segments_np = watershed(
+                image_for_watershed_np,
+                markers=markers_for_watershed_np,
+                connectivity=connectivity_val,
+                mask=mask_for_watershed_np
+            )
+        
+            watershed_segments = xp.asarray(watershed_segments_np) # Convert result back to xp array
+            # Now you can proceed with watershed_segments (which is an xp.array)
+            # unique_segment_labels = xp.unique(watershed_segments) # If xp.unique is preferred
+            # or
+            # unique_segment_labels = np.unique(watershed_segments_np) # If you need NumPy unique 
+            unique_segment_labels = xp.unique(watershed_segments)
+            num_actual_segments_created = 0
+            for seg_label in unique_segment_labels:
+                if seg_label == 0:  # This is the watershed line or background
+                    continue
+                segment_mask = (watershed_segments == seg_label).astype(xp.uint8)
+                if xp.sum(segment_mask) > 0: # Ensure the segment is not empty
+                    processing_queue.append(segment_mask) # Add new segments back to queue for size check
+                    num_actual_segments_created +=1
+            
+            if num_actual_segments_created <= 1 and current_area > max_blob_area:
+                # If watershed didn't split the region or resulted in one segment
+                # that is essentially the original large region, add the original back
+                # to avoid losing it or infinite loops.
+                output_blob_masks.append(current_mask)
+
+    # Final filter for any empty masks, though prior checks should mostly prevent this.
+    print(f"Final masks ({len(output_blob_masks)})")
+    final_masks = [mask for mask in output_blob_masks if xp.any(mask)]
+    print(f"Final masks ({len(final_masks)})")
+    
+    return final_masks
+
 def make_label(x, y, value, font_size, region_area):
     return {
         "position": (x, y),
@@ -104,7 +292,7 @@ def resolve_label_collisions(
                 continue
             # Ensure 'palette_index_for_collision' exists before accessing
             if l1.get("palette_index_for_collision") == l2.get("palette_index_for_collision"):
-                dist = np.hypot(
+                dist = xp.hypot(
                     l1["position"][0] - l2["position"][0],
                     l1["position"][1] - l2["position"][1]
                 )
@@ -166,7 +354,7 @@ def find_stable_label_pixel(region_mask): # (Assumed correct from your file)
         while 0 <= x < w and 0 <= y < h and region_mask[y, x]:
             count += 1; x += dx; y += dy
         return count
-    ys, xs = np.nonzero(region_mask)
+    ys, xs = xp.nonzero(region_mask)
     if not ys.size: return (w//2, h//2) # Fallback for empty mask
     for x, y in zip(xs, ys):
         score = (same_count(x, y, -1, 0) * same_count(x, y, 1, 0) *
@@ -180,7 +368,7 @@ def interpolate_contour(contour, step=0.5): # (Assumed correct from your file)
     if not contour: return dense
     for i in range(len(contour) -1): # Fixed: -1 for pairs
         x0, y0 = contour[i]; x1, y1 = contour[i+1]
-        dist = np.hypot(x1-x0, y1-y0)
+        dist = xp.hypot(x1-x0, y1-y0)
         num_steps = max(1, int(dist/step))
         for j in range(num_steps): # Iterate up to num_steps - 1
             t = j / float(num_steps) # Ensure float division
@@ -250,18 +438,29 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
             if contour and len(contour) > 1: # Ensure contour has points for polygon
                 draw_mask.polygon(contour, outline=1, fill=1)
         
-        current_region_mask = np.array(mask_img, dtype=np.uint8)
-        if not np.any(current_region_mask): continue # Skip if mask is empty
+        current_region_mask = xp.array(mask_img, dtype=xp.uint8)
+        if not xp.any(current_region_mask): continue # Skip if mask is empty
 
         blobs = blobbify_region(current_region_mask, min_blob_area, max_blob_area)
         for blob_mask_array in blobs: # Renamed 'blob_mask'
-            if not np.any(blob_mask_array): continue
+            if not xp.any(blob_mask_array): continue
 
-            sub_labeled_array = sklabel(blob_mask_array, connectivity=1) # Use connectivity=1 for 4-connectivity
-            for sub_region_props in regionprops(sub_labeled_array): # Renamed 'subregion'
+            # 1. Prepare input for sklabel (expects NumPy)
+            if xp.__name__ == 'cupy':
+                blob_mask_for_sklabel_np = xp.asnumpy(blob_mask_array)
+            else:
+                blob_mask_for_sklabel_np = blob_mask_array # It's already NumPy
+
+            sub_labeled_array_np = sklabel(blob_mask_for_sklabel_np, connectivity=1)
+
+            props_for_loop = regionprops(sub_labeled_array_np)
+
+            for sub_region_props in props_for_loop:
                 area = sub_region_props.area
                 # Create a mask for the current sub_region_props relative to sub_labeled_array
-                current_sub_mask = (sub_labeled_array == sub_region_props.label).astype(np.uint8)
+                current_sub_mask_np_comparison = (sub_labeled_array_np == sub_region_props.label)
+                current_sub_mask = xp.asarray(current_sub_mask_np_comparison, dtype=xp.uint8)
+
                 if area < 1: continue
 
                 mask_entry = {
@@ -280,20 +479,22 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
 
     # First pass: keep blobs that are already large enough
     temp_small_blobs = []
-    for blob_info in processed_masks_for_blobs: # Renamed 'm'
+    for blob_info in processed_masks_for_blobs: 
+        print(f"DEBUG: {blob_info['region_id']} of area {blob_info['area']}")
         if blob_info["area"] >= min_blob_area:
             final_kept_blobs.append(blob_info)
-            used_blob_ids.add(blob_info["region_id"]) # Mark as "kept as is"
+            used_blob_ids.add(blob_info["region_id"]) 
         else:
             temp_small_blobs.append(blob_info)
             
     # Second pass: try to merge small blobs
-    for small_blob_info in temp_small_blobs: # Renamed 'm'
+    print("DEBYG: second blob merge pass...")
+    for small_blob_info in temp_small_blobs:
         if small_blob_info["region_id"] in used_blob_ids: # Already merged or kept
             continue
 
         current_mask = small_blob_info["mask"]
-        dilated_mask = ndi.binary_dilation(current_mask, iterations=1) # Ensure ndi is imported
+        dilated_mask = ndi_xp.binary_dilation(current_mask, iterations=1) # Ensure ndi is imported
         
         best_match_target = None
         # Prefer merging with already kept large blobs of the same color
@@ -303,7 +504,7 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
         potential_merge_targets = []
         for target_blob_info in final_kept_blobs + [b for b in temp_small_blobs if b["region_id"] != small_blob_info["region_id"] and b["region_id"] not in used_blob_ids]:
             if target_blob_info["region_id"] == small_blob_info["region_id"]: continue # Don't merge with self
-            if np.any(dilated_mask & target_blob_info["mask"]): # If they overlap/touch
+            if xp.any(dilated_mask & target_blob_info["mask"]): # If they overlap/touch
                 potential_merge_targets.append(target_blob_info)
 
         same_color_targets = [t for t in potential_merge_targets if t["palette_index"] == small_blob_info["palette_index"]]
@@ -328,7 +529,7 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
                  target_to_update = next(k for k in temp_small_blobs if k["region_id"] == best_match_target["region_id"])
             
             if target_to_update:
-                target_to_update["mask"] = ((target_to_update["mask"] | current_mask) > 0).astype(np.uint8)
+                target_to_update["mask"] = ((target_to_update["mask"] | current_mask) > 0).astype(xp.uint8)
                 target_to_update["area"] = target_to_update["mask"].sum()
                 used_blob_ids.add(small_blob_info["region_id"]) # Mark small blob as merged
             else: # Should not happen if best_match_target was found
@@ -346,13 +547,23 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
 
     for blob_data in final_blobs_for_primitives: # Renamed 'm' to 'blob_data'
         current_blob_mask = blob_data["mask"]
-        if not np.any(current_blob_mask): continue
+        if not xp.any(current_blob_mask): continue
 
-        contours = find_contours(current_blob_mask, level=0.5)
-        if not contours: continue
+        if xp.__name__ == 'cupy':
+            current_blob_mask_np = xp.asnumpy(current_blob_mask)
+        else: # xp is numpy
+            current_blob_mask_np = current_blob_mask
+
+        # Call find_contours with the NumPy array
+        print("DEBUG: blobbify_primitives: finding contours...")
+        contours_list_np = find_contours(current_blob_mask_np, level=0.5) 
+
+        if not contours_list_np: # Check if the list of contours is empty
+            continue
 
         dense_outlines = []
-        for contour_path in contours: # Renamed 'contour' to 'contour_path'
+        for contour_path in contours_list_np: # Renamed 'contour' to 'contour_path'
+
             flipped_path = [(x, y) for y, x in contour_path]
             dense_path = interpolate_contour(flipped_path, step=0.5) if interpolate_contours else flipped_path
             outline_coords = [(int(xf), int(yf)) for xf, yf in dense_path if 0 <= int(xf) < w and 0 <= int(yf) < h]
@@ -391,7 +602,7 @@ def collect_region_primitives(
         interpolate_contours=True
         ):
     image = Image.open(input_path).convert("RGB")
-    img_data = np.array(image)
+    img_data = xp.array(image)
     height, width = img_data.shape[:2]
     primitives = []
     region_id_counter = 0
@@ -438,20 +649,58 @@ def collect_region_primitives(
 
     # --- Iterate through palette colors and then regions ---
     for idx, color_rgb_val in enumerate(palette): # Renamed 'color' to 'color_rgb_val'
-        mask = np.all(img_data == color_rgb_val, axis=-1).astype(np.uint8)
-        labeled_array = sklabel(mask, connectivity=1) # Use connectivity=1 for 4-way
 
-        for region_props in regionprops(labeled_array): # Renamed 'region' to 'region_props'
+        
+        print(f"DEBUG: loop iter {idx}")
+        print(f"  img_data type: {type(img_data)}, shape: {img_data.shape}, dtype: {img_data.dtype}")
+        print(f"  color_rgb_val type: {type(color_rgb_val)}, value: {color_rgb_val}")
+        if hasattr(color_rgb_val, 'shape'):
+            print(f"  color_rgb_val shape: {color_rgb_val.shape}")
+        if hasattr(color_rgb_val, 'dtype'):
+            print(f"  color_rgb_val dtype: {color_rgb_val.dtype}")
+        
+        color_val_on_device = xp.asarray(color_rgb_val)
+        
+        try:
+            comparison_output = (img_data == color_val_on_device)
+            print(f"  Comparison output type: {type(comparison_output)}, shape: {comparison_output.shape}, dtype: {comparison_output.dtype}")
+            all_output = xp.all(comparison_output, axis=-1)
+            print(f"  All output type: {type(all_output)}, shape: {all_output.shape}, dtype: {all_output.dtype}")
+            mask = all_output.astype(xp.uint8)
+        except Exception as e:
+            print(f"  ERROR during mask creation: {e}")
+            raise # Re-raise the exception to see the full traceback
+        
+#        mask = xp.all(img_data == color_rgb_val, axis=-1).astype(xp.uint8)
+        numpy_labeled_array = sklabel(mask.get(), connectivity=1) # Use connectivity=1 for 4-way
+        labeled_array = xp.asarray(numpy_labeled_array)
+
+        for region_props in regionprops(labeled_array.get()): # Renamed 'region' to 'region_props'
             if region_props.area < actual_min_filter_area: # Use effective filter area
                 continue
             # Skip very large regions (e.g. background) - from your existing code
             if region_props.area > 0.95 * (width * height) : 
                 continue
 
-            # region_mask is for the current specific component
-            region_mask = (labeled_array == region_props.label).astype(np.uint8)
+            region_mask = (labeled_array == region_props.label).astype(xp.uint8)
             
-            contours = find_contours(region_mask, level=0.5)
+            # region_mask is currently an xp.array (CuPy array if GPU_ENABLED is True)
+            region_mask_for_contours = region_mask
+            
+            if xp.__name__ == 'cupy': # Or your GPU_ENABLED flag
+                # Convert the CuPy array to a NumPy array on the CPU
+                region_mask_for_contours = xp.asnumpy(region_mask) 
+                # Alternatively, you could use region_mask.get(), but xp.asnumpy() is preferred.
+            
+            # Now pass the NumPy array to find_contours
+            contours = find_contours(region_mask_for_contours, level=0.5)
+            
+            # contours_from_skimage will be a list of NumPy arrays.
+            # If you need these contours back on the GPU for further xp (CuPy) operations,
+            # you'll need to convert them:
+            # e.g., contours_gpu = [xp.asarray(c) for c in contours_from_skimage]
+            
+            # region_mask is for the current specific component
             if not contours: continue
 
             minr, minc, maxr, maxc = region_props.bbox
@@ -529,10 +778,10 @@ def collect_region_primitives(
                     pixels_in_bbox_total = 0
                     pixels_in_bbox_and_region_mask = 0
                     
-                    scan_x_start = max(0, int(np.floor(l_bbox_x1)))
-                    scan_x_end = min(width, int(np.ceil(l_bbox_x2))) # Use global width
-                    scan_y_start = max(0, int(np.floor(l_bbox_y1)))
-                    scan_y_end = min(height, int(np.ceil(l_bbox_y2))) # Use global height
+                    scan_x_start = max(0, int(xp.floor(l_bbox_x1)))
+                    scan_x_end = min(width, int(xp.ceil(l_bbox_x2))) # Use global width
+                    scan_y_start = max(0, int(xp.floor(l_bbox_y1)))
+                    scan_y_end = min(height, int(xp.ceil(l_bbox_y2))) # Use global height
 
                     for y_scan in range(scan_y_start, scan_y_end):
                         for x_scan in range(scan_x_start, scan_x_end):
