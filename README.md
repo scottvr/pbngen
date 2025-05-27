@@ -62,7 +62,7 @@ python pbnpy.py "Vacation Pic.png" "./Vacation PBN" \
   --complexity master \
   --palette-from "artist_palette.png" \
   --font-path "./fonts/Arial.ttf" \
-  --label-mode stable \
+  --label_strategy stable \
   --blobbify \
   --blob-min 5 \
   --dpi 300 \
@@ -111,12 +111,13 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--complexity TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
 | `--style TEXT`                | Preprocessing style to apply to the input image: `blur`, `pixelate`, `mosaic`.                                                            | `None`         |
 | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
+| `--small-region-strategy` | This allows the selection of which labeling strategy (`centroid`, `stable`, `diagonal`) should be tried when attempting to place a label in a region that is shorter or narrower than the `tile-spacing` setting. | stable |
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
 | `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
 | `--palette-from FILE_PATH`    | Path to an image to extract a fixed palette from for the final PBN colors. This image is also subject to `--bpp` pre-quantization.        | `None`         |
 | `--font-path FILE_PATH`       | Path to a `.ttf` font file for labels and legend.                                                                                         | System default |
 | `--font-size INTEGER`         | Base font size for overlay labels and legend text.                                                                                        | 12             |
-| `--label-mode TEXT`           | Label placement strategy: `diagonal`, `centroid`, `stable`.                                                                               | `diagonal`     |
+| `--label_strategy TEXT`           | Label placement strategy: `diagonal`, `centroid`, `stable`.                                                                               | `diagonal`     |
 | `--tile-spacing INTEGER`      | Approximate distance (pixels) between repeated number labels in a large region.                                                           | 30             |
 | `--swatch-size INTEGER`       | Width/height (pixels) of each color swatch in the legend.                                                                                 | 40             |
 | `--skip-legend` / `--no-skip-legend` | If set, skips generating the palette legend image.                                                                               | `False`        |

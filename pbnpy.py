@@ -139,10 +139,10 @@ def pbn_cli(
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
     ),
     font_size: Optional[int] = typer.Option(None, "--font-size", help="Base font size. Default: 12."),
-    label_mode: str = typer.Option("diagonal", "--label-mode", help="Labeling strategy. Default: diagonal."),
+    label_strategy: str = typer.Option("diagonal", "--label-strategy", help="Labeling strategy. Default: diagonal."),
     tile_spacing: Optional[int] = typer.Option(None, "--tile-spacing", help="Label distance. Default: 30px."),
-    small_region_label_mode: Optional[str] = typer.Option(
-    "stable", "--small-region-mode", 
+    small_region_label_strategy: Optional[str] = typer.Option(
+    "stable", "--small-region-strategy", 
     help="Labeling strategy for small regions: stable, centroid, none. Default: stable."
     ),
     # --- Legend Options ---
@@ -316,8 +316,8 @@ def pbn_cli(
         "font_size": effective_font_size,
         "font_path": font_path,
         "tile_spacing": effective_tile_spacing,
-        "label_mode": label_mode,
-        "small_region_label_mode": small_region_label_mode,
+        "label_strategy": label_strategy,
+        "small_region_label_strategy": small_region_label_strategy,
         "interpolate_contours": interpolate_contours
     }
     # Only add min_region_area to the call if the user specified it via CLI
