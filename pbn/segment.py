@@ -1,23 +1,31 @@
 from skimage.measure import regionprops, find_contours
 from skimage.measure import label as sklabel
 from PIL import Image, ImageDraw, ImageFont
-import numpy as np
+import numpy as np # keep np for type hints
 import os
 import typer
 import random
 from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
+from typing import Optional
+
 try:
     import cupy as xp
     import cupyx.scipy.ndimage as ndi_xp
-    # You might want a more robust check for actual GPU availability
     if xp.cuda.is_available():
-        print("CuPy found, using GPU.")
-        GPU_ENABLED = True
+        try:
+            GPU_ENABLED
+        except NameError:
+            print("CuPy found, using GPU in segment.py.")
+            GPU_ENABLED = True
     else:
-        raise ImportError("CuPy found but CUDA not available")
+        # Fallback if CUDA not available for CuPy
+        print("CuPy found but CUDA not available, falling back to NumPy/SciPy for CPU in segment.py.")
+        import numpy as xp
+        import scipy.ndimage as ndi_xp
+        GPU_ENABLED = False
 except ImportError:
-    print("CuPy not found or not usable, falling back to NumPy/SciPy for CPU.")
+    print("CuPy not found, falling back to NumPy/SciPy for CPU in segment.py.")
     import numpy as xp
     import scipy.ndimage as ndi_xp
     GPU_ENABLED = False
@@ -205,280 +213,312 @@ def make_label(x, y, value, font_size, region_area):
     }
 
 # --- Helper for Bounding Box Overlap (already included by you) ---
-def do_bboxes_overlap(box1, box2, margin=1): # box format: (x1, y1, x2, y2)
-    return not (box1[2] + margin < box2[0] or
-                box1[0] - margin > box2[2] or
-                box1[3] + margin < box2[1] or
-                box1[1] - margin > box2[3])
+def do_bboxes_overlap(box1: tuple[float, float, float, float],
+                      box2: tuple[float, float, float, float],
+                      margin: float = 1.0) -> bool:
+    """Checks if two bounding boxes overlap, with an optional margin."""
+    # box format: (x1, y1, x2, y2)
+    return not (box1[2] + margin < box2[0] or  # box1 is to the left of box2
+                box1[0] - margin > box2[2] or  # box1 is to the right of box2
+                box1[3] + margin < box2[1] or  # box1 is above box2
+                box1[1] - margin > box2[3])   # box1 is below box2
 
-# --- Utility 1: Load Font (already included by you) ---
-def get_font_for_label(label_data, font_path_str, default_font_size_from_cli):
+def get_font_for_label(label_data: dict, font_path_str: Optional[str], default_font_size_from_cli: int) -> ImageFont.FreeTypeFont:
+    """Loads a font object for a given label's data."""
     font_sz = label_data.get("font_size", default_font_size_from_cli)
     font_to_use = None
     if font_path_str and os.path.isfile(font_path_str):
         try:
             font_to_use = ImageFont.truetype(font_path_str, font_sz)
         except IOError:
-            pass
-    if font_to_use is None:
+            pass # Font file issue, will fall back
+    
+    if font_to_use is None: # Fallback to default system font
         try:
-            font_to_use = ImageFont.load_default(size=font_sz)
-        except TypeError:
-            font_to_use = ImageFont.load_default()
-        except AttributeError:
-            font_to_use = ImageFont.load_default()
+            # Attempt to load a specific common font if truetype fails or no path
+            # This is just an example, you might prefer ImageFont.load_default() directly
+            font_to_use = ImageFont.truetype("arial.ttf", font_sz) 
+        except IOError:
+            try: # Try Pillow's load_default with size if available
+                font_to_use = ImageFont.load_default(size=font_sz)
+            except TypeError: # Older Pillow might not support size argument
+                font_to_use = ImageFont.load_default()
+            except AttributeError: # In case load_default itself has issues
+                 font_to_use = ImageFont.load_default() # Simplest fallback
     return font_to_use
 
-# --- Utility 2: Calculate Label Bounding Box (already included by you) ---
-def calculate_label_screen_bbox(label_data, font_object, dummy_draw_context, additional_nudge_pixels_up=0):
+def calculate_label_screen_bbox(label_data: dict, font_object: ImageFont.FreeTypeFont,
+                                dummy_draw_context: ImageDraw.ImageDraw,
+                                additional_nudge_pixels_up: float = 0.0) -> tuple[float, float, float, float]:
+    """Calculates the screen bounding box of a label."""
     lx, ly = label_data["position"]
     text_val = str(label_data["value"])
+    
+    # Pillow 9.2.0+ uses getbbox, older versions textbbox with (0,0) offset
     try:
-        bbox_at_origin = dummy_draw_context.textbbox((0, 0), text_val, font=font_object)
+        # Using getbbox if available (more modern Pillow)
+        bbox_at_origin = font_object.getbbox(text_val)
+        # getbbox returns (left, top, right, bottom) relative to origin (0,0)
+        # For text anchored at (0,0) top-left, left and top are often 0 or small negative values (descenders)
+        # We need width and height based on this.
         text_w = bbox_at_origin[2] - bbox_at_origin[0]
         text_h = bbox_at_origin[3] - bbox_at_origin[1]
-    except AttributeError:
-        font_sz = label_data.get("font_size", 10)
-        text_w = font_sz * len(text_val) * 0.6
-        text_h = font_sz
-        # typer.secho(f"Warning: Using rough estimate for label size for '{text_val}' due to textbbox issue.", fg=typer.colors.YELLOW, err=True)
+        # Adjust for anchor="mm" behavior: position is center.
+        # Pillow's draw.text(anchor="mm") centers the *entire* bbox including ascenders/descenders.
+        # The bbox from getbbox is what text() would use.
+        # So, if (lx,ly) is the center, the top-left (x1,y1) for the bbox is:
+        # x1 = lx - text_w / 2
+        # y1 = ly - text_h / 2 (then adjust for nudge)
+    except AttributeError: # Fallback for older Pillow using textbbox
+        try:
+            bbox_pil = dummy_draw_context.textbbox((0, 0), text_val, font=font_object)
+            text_w = bbox_pil[2] - bbox_pil[0]
+            text_h = bbox_pil[3] - bbox_pil[1]
+        except AttributeError: # Further fallback if textbbox also fails (e.g. basic font)
+            font_sz = label_data.get("font_size", 10) # Default to 10 if not found
+            text_w = font_sz * len(text_val) * 0.6 # Rough estimate
+            text_h = font_sz # Rough estimate
 
-    effective_y_center = ly - additional_nudge_pixels_up
-    x1 = lx - text_w // 2
-    y1 = effective_y_center - text_h // 2
+    effective_y_center = float(ly) - additional_nudge_pixels_up
+    
+    # Assuming (lx, ly) from label_data["position"] is intended to be the *center* of the text.
+    x1 = float(lx) - text_w / 2.0
+    y1 = effective_y_center - text_h / 2.0
     x2 = x1 + text_w
     y2 = y1 + text_h
+    
     return (x1, y1, x2, y2)
 
-# --- Main Collision Resolution Function (already included by you) ---
 def resolve_label_collisions(
-    primitives_list,
-    font_path_str,
-    default_font_size_for_fallback,
-    additional_nudge_pixels_up=0,
-    strategy="fewest_neighbors_then_area",
-    neighbor_radius_factor=3.0
-):
-    all_labels_augmented = []
-    dummy_image = Image.new("RGB", (1, 1), (255, 255, 255)) # Corrected: was "L", (1,1)
-    draw_context_for_bbox_calc = ImageDraw.Draw(dummy_image) # Renamed for clarity
+    primitives_list: list[dict],
+    font_path_str: Optional[str],
+    default_font_size_for_fallback: int,
+    additional_nudge_pixels_up: float = 0.0,
+    strategy: str = "fewest_neighbors_then_area",
+    neighbor_radius_factor: float = 3.0
+) -> list[dict]:
+    """
+    Resolves label collisions by prioritizing labels based on a strategy.
+    Optimized to use xp (CuPy/NumPy) for neighbor calculations and sorting.
+    Includes a workaround for cupy.lexsort with tuple inputs in older versions.
+    """
+    all_labels_initial_data = [] 
+    dummy_image = Image.new("RGB", (1, 1)) 
+    draw_context_for_bbox_calc = ImageDraw.Draw(dummy_image)
 
     label_id_counter = 0
+    # ... (rest of the initial data collection loop as in segment_py_optimized_collision) ...
     for prim_idx, primitive in enumerate(primitives_list):
         palette_idx_for_prim = primitive["palette_index"]
         for label_data in primitive["labels"]:
             label_data["id"] = label_id_counter
-            label_data["palette_index_for_collision"] = palette_idx_for_prim # Use a distinct key
-
             font_obj = get_font_for_label(label_data, font_path_str, default_font_size_for_fallback)
-            
             bbox_coords = calculate_label_screen_bbox(
-                label_data, 
-                font_obj, 
-                draw_context_for_bbox_calc, # Use the created dummy draw context
-                additional_nudge_pixels_up
+                label_data, font_obj, draw_context_for_bbox_calc, additional_nudge_pixels_up
             )
-            # Store bbox directly as a tuple or split for clarity if preferred
-            label_data["bbox_x1"], label_data["bbox_y1"], label_data["bbox_x2"], label_data["bbox_y2"] = bbox_coords
-            
-            all_labels_augmented.append(label_data)
+            current_label_info = {
+                "id": label_id_counter,
+                "original_primitive_idx": prim_idx,
+                "original_label_obj": label_data,
+                "pos_x": float(label_data["position"][0]),
+                "pos_y": float(label_data["position"][1]),
+                "font_size": float(label_data.get("font_size", default_font_size_for_fallback)),
+                "palette_index": palette_idx_for_prim,
+                "region_area": float(label_data.get("region_area", 0.0)),
+                "bbox_x1": bbox_coords[0], "bbox_y1": bbox_coords[1],
+                "bbox_x2": bbox_coords[2], "bbox_y2": bbox_coords[3],
+            }
+            all_labels_initial_data.append(current_label_info)
             label_id_counter += 1
 
-    for i, l1 in enumerate(all_labels_augmented):
-        l1["neighbor_count"] = 0
-        radius = l1["font_size"] * neighbor_radius_factor
-        for j, l2 in enumerate(all_labels_augmented):
-            if i == j:
-                continue
-            # Ensure 'palette_index_for_collision' exists before accessing
-            if l1.get("palette_index_for_collision") == l2.get("palette_index_for_collision"):
-                dist = xp.hypot(
-                    l1["position"][0] - l2["position"][0],
-                    l1["position"][1] - l2["position"][1]
-                )
-                if dist < radius:
-                    l1["neighbor_count"] += 1
-    
+    if not all_labels_initial_data:
+        return primitives_list
+
+    num_labels = len(all_labels_initial_data)
+
+    xp_ids = xp.array([l["id"] for l in all_labels_initial_data], dtype=int)
+    xp_pos_x = xp.array([l["pos_x"] for l in all_labels_initial_data], dtype=float)
+    xp_pos_y = xp.array([l["pos_y"] for l in all_labels_initial_data], dtype=float)
+    xp_font_sizes = xp.array([l["font_size"] for l in all_labels_initial_data], dtype=float)
+    xp_palette_indices = xp.array([l["palette_index"] for l in all_labels_initial_data], dtype=int)
+    xp_region_areas = xp.array([l["region_area"] for l in all_labels_initial_data], dtype=float)
+    xp_bboxes = xp.array(
+        [[l["bbox_x1"], l["bbox_y1"], l["bbox_x2"], l["bbox_y2"]] for l in all_labels_initial_data],
+        dtype=float
+    )
+
+    # --- Vectorized Neighbor Count Calculation (as before) ---
+    dx = xp_pos_x[:, None] - xp_pos_x[None, :]
+    dy = xp_pos_y[:, None] - xp_pos_y[None, :]
+    distances = xp.hypot(dx, dy)
+    radii_for_neighbors = xp_font_sizes * neighbor_radius_factor
+    same_palette_mask = (xp_palette_indices[:, None] == xp_palette_indices[None, :])
+    identity_matrix = xp.eye(num_labels, dtype=bool)
+    not_self_mask = ~identity_matrix
+    is_within_radius_mask = (distances < radii_for_neighbors[:, None])
+    is_neighbor_mask = is_within_radius_mask & same_palette_mask & not_self_mask
+    xp_neighbor_counts = xp.sum(is_neighbor_mask, axis=1)
+
+    # --- Sorting ---
+    # Define sort keys based on strategy.
+    # Workaround for cupy.lexsort tuple issue:
+    # If GPU_ENABLED (xp is cupy), pass a 2D array created by xp.stack.
+    # The order of arrays in xp.stack should be (primary_key, secondary_key, ...).
+    # If not GPU_ENABLED (xp is numpy), pass a tuple (..., secondary_key, primary_key).
+
+    keys_for_lexsort: Union[tuple[xp.ndarray, ...], xp.ndarray]
+
     if strategy == "smallest_area_only":
-        sort_key = lambda l: l["region_area"]
+        sorted_indices = xp.argsort(xp_region_areas)
     elif strategy == "fewest_neighbors_only":
-        sort_key = lambda l: l.get("neighbor_count", float('inf')) # Handle if key missing
+        sorted_indices = xp.argsort(xp_neighbor_counts)
     elif strategy == "smallest_area_then_neighbors":
-        sort_key = lambda l: (l["region_area"], l.get("neighbor_count", float('inf')))
-    else: # Default: "fewest_neighbors_then_area"
-        sort_key = lambda l: (l.get("neighbor_count", float('inf')), l["region_area"])
-        
-    sorted_labels = sorted(all_labels_augmented, key=sort_key)
+        # Primary key: xp_region_areas, Secondary key: xp_neighbor_counts
+        if GPU_ENABLED: # CuPy workaround/preference for stacked array
+            keys_for_lexsort = xp.stack((xp_region_areas, xp_neighbor_counts), axis=0)
+        else: # NumPy standard tuple format
+            keys_for_lexsort = (xp_neighbor_counts, xp_region_areas)
+        sorted_indices = xp.lexsort(keys_for_lexsort)
+    else:  # Default: "fewest_neighbors_then_area"
+        # Primary key: xp_neighbor_counts, Secondary key: xp_region_areas
+        if GPU_ENABLED: # CuPy workaround/preference for stacked array
+            keys_for_lexsort = xp.stack((xp_neighbor_counts, xp_region_areas), axis=0) # This line corresponds to the traceback
+        else: # NumPy standard tuple format
+            keys_for_lexsort = (xp_region_areas, xp_neighbor_counts)
+        sorted_indices = xp.lexsort(keys_for_lexsort)
 
+
+    # --- Place Labels and Check Overlaps (as before) ---
     final_kept_label_ids = set()
-    placed_bboxes = []
+    placed_bboxes_tuples = [] 
 
-    for label_candidate in sorted_labels:
-        candidate_bbox = (
-            label_candidate["bbox_x1"], label_candidate["bbox_y1"],
-            label_candidate["bbox_x2"], label_candidate["bbox_y2"]
-        )
+    if GPU_ENABLED:
+        sorted_indices_np = xp.asnumpy(sorted_indices)
+    else:
+        sorted_indices_np = sorted_indices
+
+    for i in sorted_indices_np:
+        candidate_bbox_coords = tuple(xp_bboxes[i].tolist())
         has_collision = False
-        for placed_bbox in placed_bboxes:
-            if do_bboxes_overlap(candidate_bbox, placed_bbox, margin=1):
+        for placed_bbox_tuple in placed_bboxes_tuples:
+            if do_bboxes_overlap(candidate_bbox_coords, placed_bbox_tuple, margin=1):
                 has_collision = True
                 break
-        
         if not has_collision:
-            final_kept_label_ids.add(label_candidate["id"])
-            placed_bboxes.append(candidate_bbox)
+            final_kept_label_ids.add(int(xp_ids[i].item()) if hasattr(xp_ids[i], 'item') else int(xp_ids[i]))
+            placed_bboxes_tuples.append(candidate_bbox_coords)
             
-    for primitive in primitives_list:
-        kept_labels_for_primitive = []
-        for l in primitive["labels"]:
-            if l.get("id") in final_kept_label_ids:
-                # Clean up temporary keys
-                l.pop("palette_index_for_collision", None)
-                l.pop("neighbor_count", None)
-                l.pop("bbox_x1", None); l.pop("bbox_y1", None)
-                l.pop("bbox_x2", None); l.pop("bbox_y2", None)
-                # l.pop("id", None) # Keep 'id' if it's meant to be persistent, otherwise remove
-                kept_labels_for_primitive.append(l)
-        primitive["labels"] = kept_labels_for_primitive
+    # --- Update Primitives List (as before) ---
+    for primitive_data in primitives_list:
+        kept_labels_for_this_primitive = []
+        for label_obj_in_primitive in primitive_data["labels"]:
+            if label_obj_in_primitive.get("id") in final_kept_label_ids:
+                kept_labels_for_this_primitive.append(label_obj_in_primitive)
+        primitive_data["labels"] = kept_labels_for_this_primitive
         
     return primitives_list
-
-# --- Other existing functions (find_stable_label_pixel, interpolate_contour, render_raster_from_primitives, blobbify_region) ---
-# These are assumed to be mostly correct from your provided file, with minor corrections below if needed.
 
 def find_stable_label_pixel(region_mask: xp.ndarray) -> tuple[int, int]:
     """
     Finds a 'stable' pixel within the True regions of the input mask.
-    A stable pixel is one that has a maximal product of contiguous True pixels
-    in the four cardinal directions (left, right, up, down), excluding itself.
-    This version is optimized for GPU (CuPy) if available, otherwise uses NumPy.
+    Optimized for GPU (CuPy) if available, otherwise uses NumPy.
     """
     h, w = region_mask.shape
-
     if xp.sum(region_mask) == 0:
-        # No True pixels in the mask, return center of mask as fallback (x, y)
         return (w // 2, h // 2)
 
-    # Helper function to calculate run lengths along rows (left-to-right)
-    # For each '1', it counts how many consecutive '1's are to its right (inclusive).
     def _scan_runs_rowwise_left_to_right(matrix_rows: xp.ndarray) -> xp.ndarray:
-        m, n = matrix_rows.shape # m = number of rows, n = length of rows
+        m, n = matrix_rows.shape
         counts = xp.zeros_like(matrix_rows, dtype=int)
-        
-        if n == 0: # Handle case where rows have zero length
-            return counts
-        
-        # Ensure input is integer for accumulation logic (True becomes 1, False 0)
+        if n == 0: return counts
         current_matrix_int = matrix_rows.astype(int)
-        
-        # Initialize the last column: count is 1 if mask is 1, else 0.
         counts[:, n-1] = current_matrix_int[:, n-1]
-        
-        # Iterate from the second to last column down to the first
         for i in range(n-2, -1, -1):
-            # Pixels in current column i that are '1' (as boolean)
             is_one_in_current_col = current_matrix_int[:, i].astype(bool)
-            # If matrix_rows[r, i] is 1, count is 1 + count from matrix_rows[r, i+1].
-            # If matrix_rows[r, i] is 0, count is 0.
-            # The multiplication by is_one_in_current_col achieves the conditional reset.
             counts[:, i] = (counts[:, i+1] + 1) * is_one_in_current_col
         return counts
 
-    # --- Calculate run lengths (C_dir) in four directions ---
-    # These are total lengths including the current pixel if it's 1.
-
-    # Counts_right (C_r)
     counts_r = _scan_runs_rowwise_left_to_right(region_mask)
-
-    # Counts_left (C_l)
     counts_l = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(region_mask)))
-
-    # Counts_down (C_d)
     mask_T = region_mask.T
     counts_d = _scan_runs_rowwise_left_to_right(mask_T).T
-
-    # Counts_up (C_u)
-    # This is equivalent to calculating "counts_left" on the transposed mask
     counts_u = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(mask_T))).T
     
-    # --- Calculate scores based on original logic ---
-    # Original logic: score = product of (count of *additional* neighbors in each direction, c_dir)
-    # c_dir = C_dir - 1. These values must be >= 0.
     score_val_r = xp.maximum(0, counts_r - 1)
     score_val_l = xp.maximum(0, counts_l - 1)
     score_val_d = xp.maximum(0, counts_d - 1)
     score_val_u = xp.maximum(0, counts_u - 1)
 
     scores = score_val_r * score_val_l * score_val_d * score_val_u
-    # Scores will be 0 where region_mask is 0, because for such pixels,
-    # C_dir would be 0, making C_dir - 1 negative, then max(0, negative) = 0.
-
-    # Find the flat index of the first occurrence of the maximum score
     flat_idx = xp.argmax(scores)
-    
-    # Convert flat index to 2D coordinates (row, col) which is (y, x)
     best_y_xp, best_x_xp = xp.unravel_index(flat_idx, scores.shape)
-
-    # Return as (x, y) tuple of Python ints
     return (int(best_x_xp.item()), int(best_y_xp.item()))
 
-def interpolate_contour(contour, step=0.5): # (Assumed correct from your file)
-    dense = [];
-    if not contour: return dense
-    for i in range(len(contour) -1): # Fixed: -1 for pairs
-        x0, y0 = contour[i]; x1, y1 = contour[i+1]
-        dist = xp.hypot(x1-x0, y1-y0)
-        num_steps = max(1, int(dist/step))
-        for j in range(num_steps): # Iterate up to num_steps - 1
-            t = j / float(num_steps) # Ensure float division
-            x = x0 + t * (x1-x0); y = y0 + t * (y1-y0)
-            dense.append((x,y))
-    if contour: dense.append(contour[-1]) # Ensure last point is added
+def interpolate_contour(contour: list[tuple[float,float]], step: float = 0.5) -> list[tuple[float,float]]:
+    dense = []
+    if not contour or len(contour) < 2 : # Need at least two points to interpolate
+        return contour # Return original if not enough points or empty
+
+    for i in range(len(contour) - 1):
+        x0, y0 = contour[i]
+        x1, y1 = contour[i+1]
+
+        dist = xp.hypot(x1 - x0, y1 - y0) # Using np.hypot for scalar math
+        num_steps = max(1, int(dist / step))
+
+        for j in range(num_steps): # Iterate up to num_steps - 1 to avoid duplicating next point
+            t = j / float(num_steps)
+            x = x0 + t * (x1 - x0)
+            y = y0 + t * (y1 - y0)
+            dense.append((x, y))
+    dense.append(contour[-1]) # Ensure the very last point of the original contour is added
     return dense
 
 
-def render_raster_from_primitives(canvas_size, primitives, font_path=None, additional_nudge_pixels_up=0): # Added nudge
+def render_raster_from_primitives(canvas_size: tuple[int,int], primitives: list[dict],
+                                  font_path: Optional[str] = None,
+                                  additional_nudge_pixels_up: float = 0.0) -> Image.Image:
     width, height = canvas_size
-    output = Image.new("RGB", (width, height), color=(255, 255, 255))
-    draw = ImageDraw.Draw(output)
-    pbn_color = (102, 204, 255) # Consider making this configurable
+    output_img = Image.new("RGB", (width, height), color=(255, 255, 255))
+    draw = ImageDraw.Draw(output_img)
+    pbn_color = (102, 204, 255) # Default PBN outline/text color
 
     font_path_str = str(font_path) if font_path else None
 
-    for region in primitives:
-        # Draw outlines (assuming this part is as intended)
-        for contour_points in region.get("outline", []): # Renamed 'contour' to 'contour_points'
-            # For smoother outlines, consider draw.line(contour_points, fill=pbn_color, width=1)
-            # If contour_points has enough points (e.g., >1)
-            if len(contour_points) > 1:
-                 # Pillow's draw.line can take a list of tuples
-                 draw.line(contour_points, fill=pbn_color, width=1)
-            elif contour_points: # Single point contour
-                 draw.point(contour_points[0], fill=pbn_color)
+    for region_primitive in primitives:
+        for contour_points_list in region_primitive.get("outline", []):
+            if len(contour_points_list) > 1:
+                 draw.line(contour_points_list, fill=pbn_color, width=1)
+            elif contour_points_list: # Single point
+                 draw.point(contour_points_list[0], fill=pbn_color)
 
-
-        for label in region["labels"]:
-            font_to_use = get_font_for_label(label, font_path_str, label["font_size"]) # Use utility
+        for label_data in region_primitive["labels"]:
+            # Use a default font size from label_data if available, else a fallback.
+            # default_font_size_for_fallback is not directly available here,
+            # so use label_data's font_size or a hardcoded default.
+            default_render_font_size = label_data.get("font_size", 10) 
+            font_to_use = get_font_for_label(label_data, font_path_str, default_render_font_size)
             
-            lx, ly = label["position"]
-            text_value = str(label["value"])
+            lx, ly = label_data["position"]
+            text_value = str(label_data["value"])
             
-            effective_y_for_anchor = ly - additional_nudge_pixels_up
+            # Adjust y for rendering based on nudge (consistent with bbox calculation)
+            effective_y_for_anchor = float(ly) - additional_nudge_pixels_up
 
             try:
-                draw.text((lx, effective_y_for_anchor), text_value, 
+                # Using anchor="mm" centers the text at (lx, effective_y_for_anchor)
+                draw.text((float(lx), effective_y_for_anchor), text_value,
                           font=font_to_use, fill=pbn_color, anchor="mm")
-            except (TypeError, AttributeError, ValueError): 
-                bbox_calc_dummy_img = Image.new("L",(1,1)) # Need a dummy for bbox calc here
-                bbox_calc_draw = ImageDraw.Draw(bbox_calc_dummy_img)
-                l_bbox_x1, l_bbox_y1, l_bbox_x2, l_bbox_y2 = calculate_label_screen_bbox(
-                    label, font_to_use, bbox_calc_draw, additional_nudge_pixels_up
-                )
-                # Fallback uses absolute top-left
-                draw.text((l_bbox_x1, l_bbox_y1), text_value, 
-                          font=font_to_use, fill=pbn_color)
+            except (TypeError, AttributeError, ValueError) as e:
+                # Fallback if anchor="mm" fails or other text issues
+                # Calculate bbox again for manual top-left placement (less ideal)
+                # This requires a dummy draw context if not available.
+                # For simplicity, this fallback might be rough.
+                # print(f"Warning: Fallback text rendering for label '{text_value}'. Error: {e}")
+                # Fallback: draw at (lx, ly) as top-left, which might not be centered.
+                draw.text((float(lx), float(ly)), text_value, font=font_to_use, fill=pbn_color)
                           
-    return output
+    return output_img
 
 def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fixed_font_size, interpolate_contours=True):
     h, w = img_shape
