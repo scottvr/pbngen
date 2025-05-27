@@ -77,15 +77,15 @@ This example:
 Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 - **Final PBN Files:**
-    - `out/quantized_pbn.png`: The input image reduced to the final PBN color palette (e.g., 12 colors). This is the image used for segmentation.
-    - `out/labeled.png`: The main raster (PNG) paint-by-number guide with outlines and numeric labels.
-    - `out/vector.svg`: A vector (SVG) version of the paint-by-number guide (if not `--raster-only`).
-    - `out/legend.png`: A color swatch legend mapping numbers to the final PBN palette colors (if not `--skip-legend`).
+    - `out/pbn_guide-ncolor_quantized.png`: The input image reduced to the final PBN color palette (e.g., 12 colors). This is the image used for segmentation and is a fair representation of what your painting should look like when completed.
+    - `out/raster-pbn_canvas.png`: The main raster (PNG) paint-by-number guide with outlines and numeric labels.
+    - `out/vector-pbn_canvas.svg`: A vector (SVG) version of the above (if not `--raster-only`). This is what you'll want to use if you are sending the image to a print shop for otuput to a large canvas since vector graphics scale without losing fidelity.
+    - `out/palette-pbn_legend.png`: A color swatch legend mapping numbers to the final PBN palette colors (if not `--skip-legend`).
 
 - **Intermediate Files (may be present in the output directory):**
     - `out/styled_input.png`: If a `--style` is applied.
-    - `out/bpp_quantized_input.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
-    - `out/bpp_quantized_palette_source.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
+    - `out/input-bpp_quantized.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
+    - `out/bpp_quantized_palette_input.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
  **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.i**
 
@@ -107,7 +107,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `INPUT_FILE`                  | (Positional) Path to the input image file.                                                                                                | **Required** |
 | `OUTPUT_DIRECTORY`            | (Positional) Path to the directory where output files will be saved.                                                                      | **Required** |
 | `--complexity TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
-| `--style TEXT`                | Preprocessing style to apply to the input image: `blur`, `pixelate`, `mosaic`.                                                            | `None`         |
+| `--style TEXT`                | Preprocessing style to apply to the input image: `blur`, `pixelate`, `mosaic`, `impressionist`, `test`, `test2`.                                                            | `None`         |
 | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
 | `--small-region-strategy` | This allows the selection of which labeling strategy (`centroid`, `stable`, `diagonal`) should be tried when attempting to place a label in a region that is shorter or narrower than the `tile-spacing` setting. | stable |
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
@@ -124,6 +124,11 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--blobbify` / `--no-blobbify`| Enable painterly splitting of color regions into smaller, more organic 'blobs'.                                                          | `False`        |
 | `--blob-min INTEGER`          | Minimum blob area in mm² (used if `--blobbify` is active).                                                                                | 3              |
 | `--blob-max INTEGER`          | Maximum blob area in mm² (used if `--blobbify` is active).                                                                                | 30             |
+| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly style filters that make multiple passes                                       | 1 - 3    |
+| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a style filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
+| `--brush-step INTEGER`        | how many units (px) to step down between brush changes, where applicable.                     | Calculated based on `num-brushes` and `brush-size`.   |
+| `--focus INTEGER`             | How "tidy" the pre-pbn style filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
+| `--fervor INTEGER`            | How "manic" the pre-pbning style filter brush strokes are. Higher is more intense and takes longer.   |   1       |
 | `--min-label-font INTEGER`    | Minimum font size allowed for blob labeling if `--blobbify` is active.                                                                    | 8              |
 | `--interpolate-contours` / `--no-interpolate-contours` | Interpolate contour lines for smoother appearance. Disable for simpler SVGs.                                    | `True`         |
 | `--dpi INTEGER`               | Dots Per Inch (DPI) for mm² to pixel conversion (used with `--blobbify`). Overrides DPI from image metadata if provided.                | Auto or 96     |
