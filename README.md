@@ -332,9 +332,11 @@ Google Colab cuml usage:
 % python pbnpy.py inputimage.png ./output_dir
 ```
 
+There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbnpy doesn't yet gain much from this scikit acceleration, but after a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
+
 ### Note Concerning scikit-learn (cuml) GPU Acceleration on Windows
 
-Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers.
+Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers if you are on a Windows system. The aforementioned (and linked) RAPIDS Colab might be what I'd suggest since it's already Linux, the setup is already in the notebook, Google's GPUs are likely bigger than yours, and it took less than a minute (the notebook warns it should take ~5 min, but it wasn't even 60 seconds when I tried it.)
 
 In short you will need the NVIDIA **Windows** driver, WSL2 working on your Windows machine, and basic Linux knowledge for the distro you installed in WSL2.
 See these links for details:

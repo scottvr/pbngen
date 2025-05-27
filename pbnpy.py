@@ -150,7 +150,7 @@ def pbn_cli(
     ),
     brush_size: Optional[int] = typer.Option(
         None, "--brush-size", min=1,
-        help="diameter of elliptical \"brush\" used in pre-style filters (where applicable.)"
+        help="diameter of elliptical \"brush\" used in pre-pbning style filters (where applicable.)"
     ),
     brush_step: Optional[int] = typer.Option(
         None, "--brush-step", min=2,
