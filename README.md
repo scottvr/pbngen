@@ -331,11 +331,12 @@ $ load_ext cuml.accel
 $ python pbnpy.py inputimage.png ./output_dir
 ```
 
-### Note Concerning scikit-learn GPU Acceleration on Windows
+### Note Concerning scikit-learn (cuml) GPU Acceleration on Windows
 
 Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers.
 
 In short you will need the NVIDIA **Windows** driver, WSL2 working on your Windows machine, and basic Linux knowledge for the distro you installed in WSL2.
+See these links for details:
 
 - [CUDA in WLS2 User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
 - [Installing RAPIDS under WSL2](https://docs.rapids.ai/install/#wsl2)
