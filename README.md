@@ -326,10 +326,10 @@ To take full advantage of GPU acceleration, I suggest installing [NVIDIA RAPIDS 
 To get scikit-learn to use these accelerated functions you must run
 `python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...` 
 
-Example:
+Google Colab cuml usage:
 ``` bash
-$ load_ext cuml.accel
-$ python pbnpy.py inputimage.png ./output_dir
+% load_ext cuml.accel
+% python pbnpy.py inputimage.png ./output_dir
 ```
 
 ### Note Concerning scikit-learn (cuml) GPU Acceleration on Windows
