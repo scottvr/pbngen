@@ -1,4 +1,4 @@
-# PbnGen: Python Paint-By-Number Generator
+# Lead Engine (PbnGen): the Python Paint-By-Number Generator
 
 **PbnGen** is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
 
