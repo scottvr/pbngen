@@ -391,6 +391,8 @@ The matrix math that parallelizes the aforementioned stable ranking algorithm ca
 
 The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai). Thank ya, boys!
 
+-----
+
 License
 ========
 
