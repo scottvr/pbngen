@@ -118,14 +118,14 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--label_strategy TEXT`           | Label placement strategy: `diagonal`, `centroid`, `stable`.                                                                               | `diagonal`     |
 | `--tile-spacing INTEGER`      | Approximate distance (pixels) between repeated number labels in a large region.                                                           | 30             |
 | `--swatch-size INTEGER`       | Width/height (pixels) of each color swatch in the legend.                                                                                 | 40             |
-| `--skip-legend` / `--no-skip-legend` | If set, skips generating the palette legend image.                                                                               | `False`        |
-| `--raster-only` / `--no-raster-only` | Only generate raster output (labeled PNG); skip vector SVG output.                                                                 | `False`        |
+| `--skip-legend` | If set, skips generating the palette legend image.                                                                               | `False`        |
+| `--raster-only` | Only generate raster output (labeled PNG); skip vector SVG output.                                                                 | `False`        |
 | `--yes` / `-y`                | Automatically overwrite existing output files without prompting.                                                                          | `False`        |
-| `--blobbify` / `--no-blobbify`| Enable painterly splitting of color regions into smaller, more organic 'blobs'.                                                          | `False`        |
+| `--blobbify` | Enable painterly splitting of color regions into smaller, more organic 'blobs'.                                                          | `False`        |
 | `--blob-min INTEGER`          | Minimum blob area in mm² (used if `--blobbify` is active).                                                                                | 3              |
 | `--blob-max INTEGER`          | Maximum blob area in mm² (used if `--blobbify` is active).                                                                                | 30             |
 | `--min-label-font INTEGER`    | Minimum font size allowed for blob labeling if `--blobbify` is active.                                                                    | 8              |
-| `--interpolate-contours` / `--no-interpolate-contours` | Interpolate contour lines for smoother appearance. Disable for simpler SVGs.                                    | `True`         |
+| `--no-interpolate-contours` |  Do not interpolate contour lines for smoother appearance. Disable for simpler SVGs.                                    | `True`         |
 | `--dpi INTEGER`               | Dots Per Inch (DPI) for mm² to pixel conversion (used with `--blobbify`). Overrides DPI from image metadata if provided.                | Auto or 96     |
 | `-h`, `--help`                | Show the help message and exit.                                                                                                           |                |
 
