@@ -223,6 +223,7 @@ python pbnpy.py my_image.jpg ./output_12x16 \
   --dpi 300 \
   --num-colors 2
 ```
+-----
 
 ### Label Modes (Placement Strategies)
 
