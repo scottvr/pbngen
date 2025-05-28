@@ -124,43 +124,12 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--blobbify` / `--no-blobbify`| Enable painterly splitting of color regions into smaller, more organic 'blobs'.                                                          | `False`        |
 | `--blob-min INTEGER`          | Minimum blob area in mm² (used if `--blobbify` is active).                                                                                | 3              |
 | `--blob-max INTEGER`          | Maximum blob area in mm² (used if `--blobbify` is active).                                                                                | 30             |
-| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly style filters that make multiple passes                                       | 1 - 3    |
-| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a style filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
-| `--brush-step INTEGER`        | how many units (px) to step down between brush changes, where applicable.                     | Calculated based on `num-brushes` and `brush-size`.   |
-| `--focus INTEGER`             | How "tidy" the pre-pbn style filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
-| `--fervor INTEGER`            | How "manic" the pre-pbning style filter brush strokes are. Higher is more intense and takes longer.   |   1       |
 | `--min-label-font INTEGER`    | Minimum font size allowed for blob labeling if `--blobbify` is active.                                                                    | 8              |
 | `--interpolate-contours` / `--no-interpolate-contours` | Interpolate contour lines for smoother appearance. Disable for simpler SVGs.                                    | `True`         |
 | `--dpi INTEGER`               | Dots Per Inch (DPI) for mm² to pixel conversion (used with `--blobbify`). Overrides DPI from image metadata if provided.                | Auto or 96     |
 | `-h`, `--help`                | Show the help message and exit.                                                                                                           |                |
 
-### Understanding `--bpp` vs `--num-colors`
 
-These two options control color reduction at different stages:
-
-1.  **`--bpp INTEGER` (Initial Pre-quantization):**
-    * If provided, this option performs an *initial* global color reduction on the input image (and the `--palette-from` image, if used).
-    * It quantizes the image(s) to `2^BPP` colors (e.g., `--bpp 8` results in 256 colors).
-    * This step is useful for:
-        * Standardizing the color palette of diverse input images before PBN-specific processing.
-        * Working within a constrained color space if the original image has an extremely high number of colors.
-        * Ensuring that a user-supplied palette (via `--palette-from`) is considered from within this same reduced color space.
-    * The output of this stage (if `--bpp` is used) becomes the input for the next stage.
-
-2.  **`--num-colors INTEGER` (Final PBN Palette Size):**
-    * This determines the number of colors that will be in your *final paint-by-number palette*.
-    * The PBN quantization process (using scikit-learn's KMeans or a fixed palette from `--palette-from`) will reduce the (potentially BPP-pre-quantized) image to this many colors.
-    * This is the number of distinct paints you'll need.
-
-**Example Flow:**
-`INPUT_IMAGE (e.g., 24-bit color)`
-  `--bpp 8` → `INTERMEDIATE_IMAGE_1 (256 colors)`
-    `--num-colors 16` (using KMeans on INTERMEDIATE_IMAGE_1) → `FINAL_PBN_IMAGE (16 colors for painting)`
-
-If `--palette-from MY_PALETTE.PNG` is also used with `--bpp 8` and `--num-colors 16`:
-`INPUT_IMAGE` → `INTERMEDIATE_INPUT (256 colors)`
-`MY_PALETTE.PNG` → `INTERMEDIATE_PALETTE_SOURCE (256 colors)`
-  Then, 16 colors are extracted from `INTERMEDIATE_PALETTE_SOURCE` and used to quantize `INTERMEDIATE_INPUT` to the `FINAL_PBN_IMAGE (16 colors)`.
 
 ### Complexity Presets
 
@@ -178,6 +147,10 @@ If `--palette-from MY_PALETTE.PNG` is also used with `--bpp 8` and `--num-colors
 | `blur`     | Applies a Gaussian blur.                 |
 | `pixelate` | Chunky low-resolution pixelation.        |
 | `mosaic`   | Pixelate and upscale for blended effect. |
+| `impressionist` | Make the source image look more "painterly" before beginning the PBN conversion. |
+| `test`  | A slightly-better attempt at the above. Introduces the --brush-* options elsewhere described. |
+| `test2` | About on par with the previous, but responds to `fervor` rather than `focus` and behaves differently in the lack of --brush-* arguments |
+
 
 ### Styling Options and Parameters
 
@@ -188,10 +161,15 @@ The `--style TEXT` option allows you to apply a visual preprocessing effect to y
 | `--style blur`      | `--blur-radius INTEGER`     | Sets the radius for the Gaussian blur effect. Higher values increase blurriness. Must be a positive integer.        | `4` (as defined in the `stylize` module)                             |
 | `--style pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
 | `--style mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
+| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly style filters that make multiple passes                                       | 1 - 3    |
+| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a style filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
+| `--brush-step INTEGER`        | how many units (px) to step down between brush changes, where applicable.                     | Calculated based on `num-brushes` and `brush-size`.   |
+| `--focus INTEGER`             | How "tidy" the pre-pbn style filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
+| `--fervor INTEGER`            | How "manic" the pre-pbning style filter brush strokes are. Higher is more intense and takes longer.   |   1       |
 
 -----
 
-**How to Use:**
+**How to Use Styling Options:**
 
 First, select a style with `--style <style_name>`, then optionally add its corresponding parameter flag. For example:
 
@@ -252,6 +230,33 @@ python pbnpy.py my_image.jpg ./output_12x16 \
 -   `centroid`: Places a single label at the geometric center of each region. Best for simple, convex shapes.
 -   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but is significantly slower.
 
+### Understanding `--bpp` vs `--num-colors`
+
+These two options control color reduction at different stages:
+
+1.  **`--bpp INTEGER` (Initial Pre-quantization):**
+    * If provided, this option performs an *initial* global color reduction on the input image (and the `--palette-from` image, if used).
+    * It quantizes the image(s) to `2^BPP` colors (e.g., `--bpp 8` results in 256 colors).
+    * This step is useful for:
+        * Standardizing the color palette of diverse input images before PBN-specific processing.
+        * Working within a constrained color space if the original image has an extremely high number of colors.
+        * Ensuring that a user-supplied palette (via `--palette-from`) is considered from within this same reduced color space.
+    * The output of this stage (if `--bpp` is used) becomes the input for the next stage.
+
+2.  **`--num-colors INTEGER` (Final PBN Palette Size):**
+    * This determines the number of colors that will be in your *final paint-by-number palette*.
+    * The PBN quantization process (using scikit-learn's KMeans or a fixed palette from `--palette-from`) will reduce the (potentially BPP-pre-quantized) image to this many colors.
+    * This is the number of distinct paints you'll need.
+
+**Example Flow:**
+`INPUT_IMAGE (e.g., 24-bit color)`
+  `--bpp 8` → `INTERMEDIATE_IMAGE_1 (256 colors)`
+    `--num-colors 16` (using KMeans on INTERMEDIATE_IMAGE_1) → `FINAL_PBN_IMAGE (16 colors for painting)`
+
+If `--palette-from MY_PALETTE.PNG` is also used with `--bpp 8` and `--num-colors 16`:
+`INPUT_IMAGE` → `INTERMEDIATE_INPUT (256 colors)`
+`MY_PALETTE.PNG` → `INTERMEDIATE_PALETTE_SOURCE (256 colors)`
+  Then, 16 colors are extracted from `INTERMEDIATE_PALETTE_SOURCE` and used to quantize `INTERMEDIATE_INPUT` to the `FINAL_PBN_IMAGE (16 colors)`.
 
 # How it works
 
