@@ -25,7 +25,7 @@ Requires Python 3.7+
 pip install -r requirements.txt
 ```
 
-**note: if using GPU, please ensure you have CUDA correctly configured, and you will need to `pip install cupy` if it isn't already in your environment.**
+**Note: if using GPU, please ensure you have CUDA correctly configured, and you will need to `pip install cupy` if it isn't already in your environment.**
 
 Windows users: see [section on GPU under WSL](#note-concerning-scikit-learn-cuml-gpu-acceleration-on-windows)
 ## Usage
@@ -87,7 +87,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/input-bpp_quantized.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
     - `out/bpp_quantized_palette_input.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
- **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.i**
+ **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.**
 
 ## Tips for Best Results
 
