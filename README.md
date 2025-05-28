@@ -96,7 +96,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 - experiment; try both and see which gives better results
 - **likewise for the rest of the options below. Try a smaller font size. Try mixing and matching complexity presets with non-default font-size, tile-spacing, etc.**
 - Please read the documentation to the end and try a few settings before opening an Issue
-- If it really seems that pbngen is failing to make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
+- If it really seems that pbngen can't make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
 
 -----
 
@@ -342,7 +342,7 @@ This generates a PBN for `landscape.png` with 20 final colors, where regions are
 
 ## Hardware Support (GPU Acceleration)
 
-Some operations are computationally-expensive enough that for a large and complex source image, no amount if CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. 
+Some operations are computationally-expensive enough that for a large and complex source image, no amount of CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. 
 
 If installed, PbNgen will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
