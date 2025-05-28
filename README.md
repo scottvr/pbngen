@@ -379,6 +379,7 @@ See these links for details:
 - [CUDA in WLS2 User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
 - [Installing RAPIDS under WSL2](https://docs.rapids.ai/install/#wsl2)
 
+-----
 
 ## Credits
 
