@@ -9,27 +9,38 @@ from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from typing import Optional
 
-try:
-    import cupy as xp
-    import cupyx.scipy.ndimage as ndi_xp
-    if xp.cuda.is_available():
-        try:
-            GPU_ENABLED
-        except NameError:
-            print("CuPy found, using GPU in segment.py.")
-            GPU_ENABLED = True
-    else:
-        # Fallback if CUDA not available for CuPy
-        print("CuPy found but CUDA not available, falling back to NumPy/SciPy for CPU in segment.py.")
+_PBNPY_FORCE_NUMPY_ENV = os.environ.get("PBNPY_FORCE_NUMPY", "0").lower()
+print(f"DEBUG: {_PBNPY_FORCE_NUMPY_ENV}")
+FORCE_NUMPY_BACKEND = _PBNPY_FORCE_NUMPY_ENV in ("1", "true", "yes")
+
+if FORCE_NUMPY_BACKEND:
+    print("PBNPY_FORCE_NUMPY is set. Forcing NumPy backend in segment.py.")
+    xp = np # Alias xp to numpy
+    import scipy.ndimage # Alias ndi_xp to scipy.ndimage
+    ndi_xp = scipy.ndimage
+    GPU_ENABLED = False
+else:
+    try:
+        import cupy as xp
+        import cupyx.scipy.ndimage as ndi_xp
+        if xp.cuda.is_available():
+            try:
+                GPU_ENABLED
+            except NameError:
+                print("CuPy found, using GPU in segment.py.")
+                GPU_ENABLED = True
+        else:
+            # Fallback if CUDA not available for CuPy
+            print("CuPy found but CUDA not available, falling back to NumPy/SciPy for CPU in segment.py.")
+            import numpy as xp
+            import scipy.ndimage as ndi_xp
+            GPU_ENABLED = False
+    except ImportError:
+        print("CuPy not found, falling back to NumPy/SciPy for CPU in segment.py.")
         import numpy as xp
         import scipy.ndimage as ndi_xp
         GPU_ENABLED = False
-except ImportError:
-    print("CuPy not found, falling back to NumPy/SciPy for CPU in segment.py.")
-    import numpy as xp
-    import scipy.ndimage as ndi_xp
-    GPU_ENABLED = False
-
+    
 def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: int) -> list[xp.ndarray]:
     """
     Breaks down a large binary region mask into smaller "blob" masks.
@@ -166,7 +177,7 @@ def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: 
             # Debug prints to verify types RIGHT BEFORE the watershed call
             print(f"DEBUG: About to call watershed. Types are:")
            
-            connectivity_val = 1 # Or whatever your connectivity is
+            connectivity_val = 2 
           
             # Call watershed with the (now hopefully) NumPy arrays
             watershed_segments_np = watershed(
@@ -180,7 +191,6 @@ def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: 
             # Now you can proceed with watershed_segments (which is an xp.array)
             # unique_segment_labels = xp.unique(watershed_segments) # If xp.unique is preferred
             # or
-            # unique_segment_labels = np.unique(watershed_segments_np) # If you need NumPy unique 
             unique_segment_labels = xp.unique(watershed_segments)
             num_actual_segments_created = 0
             for seg_label in unique_segment_labels:
@@ -463,7 +473,7 @@ def interpolate_contour(contour: list[tuple[float,float]], step: float = 0.5) ->
         x0, y0 = contour[i]
         x1, y1 = contour[i+1]
 
-        dist = xp.hypot(x1 - x0, y1 - y0) # Using np.hypot for scalar math
+        dist = np.hypot(x1 - x0, y1 - y0) # Using np.hypot for scalar math to avoid transfer between CPU and GPU
         num_steps = max(1, int(dist / step))
 
         for j in range(num_steps): # Iterate up to num_steps - 1 to avoid duplicating next point
@@ -587,7 +597,7 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
             temp_small_blobs.append(blob_info)
             
     # Second pass: try to merge small blobs
-    print("DEBYG: second blob merge pass...")
+    print("DEBUG: second blob merge pass...")
     for small_blob_info in temp_small_blobs:
         if small_blob_info["region_id"] in used_blob_ids: # Already merged or kept
             continue
@@ -634,8 +644,9 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
             else: # Should not happen if best_match_target was found
                 final_kept_blobs.append(small_blob_info) # Failsafe: keep it if target not found for update
                 used_blob_ids.add(small_blob_info["region_id"])
-
+            print("DEBUG: Found best match to merge...")
         else: # No neighbor to merge with, keep it if it wasn't used.
+            print("DEBUG: No neighbor to merge with...")
             if small_blob_info["region_id"] not in used_blob_ids:
                  final_kept_blobs.append(small_blob_info)
                  used_blob_ids.add(small_blob_info["region_id"])
