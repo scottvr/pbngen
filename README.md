@@ -189,6 +189,8 @@ The `--style TEXT` option allows you to apply a visual preprocessing effect to y
 | `--style pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
 | `--style mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
 
+-----
+
 **How to Use:**
 
 First, select a style with `--style <style_name>`, then optionally add its corresponding parameter flag. For example:
@@ -250,7 +252,11 @@ python pbnpy.py my_image.jpg ./output_12x16 \
 -   `centroid`: Places a single label at the geometric center of each region. Best for simple, convex shapes.
 -   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but is significantly slower.
 
+
+# How it works
+
 ### Pipeline Diagram
+
 The image processing pipeline involves several stages:
 
 ```mermaid
@@ -284,6 +290,10 @@ graph TD
 ```
 
 As you can see, the vector representation is the source for the raster, so eliding it won't save any time. 
+
+-----
+
+## Exoerimental Features
 
 ## Painterly Output with `--blobbify`
 
@@ -320,21 +330,27 @@ python pbnpy.py "landscape.png" "./landscape_pbn_blobs" \
 ```
 This generates a PBN for `landscape.png` with 20 final colors, where regions are blobbified into sizes roughly between 4mm² and 25mm² (calculated at 150 DPI), and labels use Comic Sans with a minimum size of 9pt.
 
-## GPU Support
+### Hardware Support (GPU Acceleration)
 
-As already mentioned, you need to have a working CUDA installation, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of size (or output canvas size) you may find that the CPU-only version is just painfully slow.
+Some operations are computationally-expensive enough that for a large and complex source image, no amount if CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. If installed, PBNPy will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
-This link will help you get it set up if it isn't already: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
+As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of size (or output canvas size), or your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+
+This link will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
 PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
 
-To take full advantage of GPU acceleration, I suggest installing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs there. 
+Further, some of SciKit Learn's functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked. 
 
-To get scikit-learn to use these accelerated functions you must run
-`python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...` 
+To get scikit-learn to use these accelerated functions you must wrap your pbnpy invocation with it like: 
 
-Google Colab cuml usage:
-``` bash
+``` bash 
+python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...
+``` 
+
+### Running on Google Colab
+
+``` jupyter
 % load_ext cuml.accel
 % python pbnpy.py inputimage.png ./output_dir
 ```
