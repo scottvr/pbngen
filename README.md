@@ -337,19 +337,23 @@ python pbnpy.py "landscape.png" "./landscape_pbn_blobs" \
 ```
 This generates a PBN for `landscape.png` with 20 final colors, where regions are blobbified into sizes roughly between 4mm² and 25mm² (calculated at 150 DPI), and labels use Comic Sans with a minimum size of 9pt.
 
-### Hardware Support (GPU Acceleration)
+-----
 
-Some operations are computationally-expensive enough that for a large and complex source image, no amount if CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. If installed, PBNPy will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
+## Hardware Support (GPU Acceleration)
 
-As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of size (or output canvas size), or your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+Some operations are computationally-expensive enough that for a large and complex source image, no amount if CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. 
 
-This link will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
+If installed, PBNPy will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
+
+As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+
+This link is to instructions that will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
 PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
 
-Further, some of SciKit Learn's functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked. 
+Further, some of SciKit Learn's (sk-learn) functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked here. 
 
-To get scikit-learn to use these accelerated functions you must wrap your pbnpy invocation with it like: 
+To get scikit-learn to use these accelerated functions you must wrap your pbnpy invocation with cuml like so: 
 
 ``` bash 
 python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...
@@ -362,9 +366,9 @@ python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...
 % python pbnpy.py inputimage.png ./output_dir
 ```
 
-There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbnpy doesn't yet gain much from this scikit acceleration, but after a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
+There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbnpy doesn't yet gain a while lot just yet from this additional scikit acceleration, but after seeing a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
 
-### Note Concerning scikit-learn (cuml) GPU Acceleration on Windows
+**Note Concerning CuML GPU Acceleration on Windows**
 
 Because NVIDIA RAPIDS is compiled for a linux target, you'll have to run it under WSL2 to get the performance increase CuML offers if you are on a Windows system. The aforementioned (and linked) RAPIDS Colab might be what I'd suggest since it's already Linux, the setup is already in the notebook, Google's GPUs are likely bigger than yours, and it took less than a minute (the notebook warns it should take ~5 min, but it wasn't even 60 seconds when I tried it.)
 
@@ -374,6 +378,16 @@ See these links for details:
 - [CUDA in WLS2 User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
 - [Installing RAPIDS under WSL2](https://docs.rapids.ai/install/#wsl2)
 
+
+## Credits
+
+PBNPy is the work of [scottvr](https://github.com/scottvr) and is a rewrite of some old bash, perl and ImageMagick voodoo I used to use to accomplish mostly the same, albeit without as good a resultant product. PBNPy is still undergoing active development so if you have a feature request or bug report, please let me know via Issues. If you have an ehancement, please send me a PR on Github.
+
+The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PBNify albeit in a different interface and without hardware acceleration or the ludicrous configurability of PBNPy. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
+
+The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was shown to me by [Gemini Alpha 2.5 Pro](https://gemini.google.com/).
+
+The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai). Thank ya, boys!
 
 ## License
 
