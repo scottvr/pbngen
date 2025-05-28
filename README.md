@@ -297,7 +297,7 @@ graph TD
     end
 ```
 
-As you can see, the vector representation is the source for the raster, so eliding it won't save any time. 
+As you can see, the vector representation (of segmented primitives) is the source for the raster image, so eliding SVG output it won't save any noteiceable time. 
 
 -----
 
