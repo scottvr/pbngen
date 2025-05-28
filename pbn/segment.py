@@ -8,13 +8,14 @@ import random
 from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from typing import Optional
+from numba import cuda
+import math 
 
 _PBNPY_FORCE_NUMPY_ENV = os.environ.get("PBNPY_FORCE_NUMPY", "0").lower()
 print(f"DEBUG: _PBNPY_FORCE_NUMPY_ENV = {_PBNPY_FORCE_NUMPY_ENV}")
-FORCE_NUMPY_BACKEND = _PBNPY_FORCE_NUMPY_ENV in ("1", "true", "yes")
+FORCE_NUMPY_BACKEND = 0
 print(f"DEBUG: FORCE_NUMPY_BACKEND = {FORCE_NUMPY_BACKEND}")
 
-exit()
 if FORCE_NUMPY_BACKEND:
     print("PBNPY_FORCE_NUMPY is set. Forcing NumPy backend in segment.py.")
     xp = np # Alias xp to numpy
@@ -42,7 +43,37 @@ else:
         import numpy as xp
         import scipy.ndimage as ndi_xp
         GPU_ENABLED = False
-    
+
+@cuda.jit
+def scan_rows_kernel_for_gpu(matrix_in_gpu, counts_out_gpu, num_cols):
+    """
+    Numba CUDA kernel to perform a right-to-left scan for consecutive 1s on each row.
+    Each GPU thread is intended to process one row of matrix_in_gpu.
+
+    Args:
+        matrix_in_gpu: 2D device array (e.g., CuPy array) of 0s and 1s (uint8 recommended).
+        counts_out_gpu: 2D device array (e.g., CuPy array) to store the resulting counts (int32 recommended).
+        num_cols: The number of columns in matrix_in_gpu and counts_out_gpu.
+    """
+    # cuda.grid(1) gives a unique global index for each thread in a 1D grid.
+    # We map this directly to the row index.
+    row_idx = cuda.grid(1)
+
+    # Ensure the thread is within the bounds of the number of rows
+    if row_idx < matrix_in_gpu.shape[0]:
+        if num_cols > 0:
+            # Initialize the last element of the current row in counts_out_gpu
+            counts_out_gpu[row_idx, num_cols - 1] = matrix_in_gpu[row_idx, num_cols - 1]
+            
+            # Perform the scan from right-to-left for the current row
+            # This loop runs *inside each GPU thread* for its assigned row
+            for i in range(num_cols - 2, -1, -1): # Python's range is fine here for Numba
+                if matrix_in_gpu[row_idx, i] == 1: # Assuming matrix_in_gpu contains 0s and 1s
+                    counts_out_gpu[row_idx, i] = counts_out_gpu[row_idx, i + 1] + 1
+                else:
+                    counts_out_gpu[row_idx, i] = 0
+
+
 def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: int) -> list[xp.ndarray]:
     """
     Breaks down a large binary region mask into smaller "blob" masks.
@@ -440,14 +471,44 @@ def find_stable_label_pixel(region_mask: xp.ndarray) -> tuple[int, int]:
         return (w // 2, h // 2)
 
     def _scan_runs_rowwise_left_to_right(matrix_rows: xp.ndarray) -> xp.ndarray:
-        m, n = matrix_rows.shape
-        counts = xp.zeros_like(matrix_rows, dtype=int)
-        if n == 0: return counts
-        current_matrix_int = matrix_rows.astype(int)
-        counts[:, n-1] = current_matrix_int[:, n-1]
-        for i in range(n-2, -1, -1):
-            is_one_in_current_col = current_matrix_int[:, i].astype(bool)
-            counts[:, i] = (counts[:, i+1] + 1) * is_one_in_current_col
+        """
+        Calculates run lengths of 1s row-wise, scanning from right to left.
+        Uses a Numba CUDA kernel if GPU_ENABLED and xp is CuPy.
+        Otherwise, falls back to a loop suitable for NumPy.
+        """
+        num_rows, num_cols = matrix_rows.shape
+        # Ensure counts array is of a type Numba kernel can write to (e.g., int32)
+        # and matches the device of matrix_rows.
+        counts = xp.zeros_like(matrix_rows, dtype=xp.int32) 
+
+        if num_cols == 0:
+            return counts
+
+        if GPU_ENABLED and xp.__name__ == 'cupy':
+            # Ensure input matrix is suitable for the kernel (e.g., uint8 for 0s and 1s)
+            # The kernel expects 0s and 1s. If matrix_rows is boolean, convert.
+            matrix_for_kernel = matrix_rows.astype(xp.uint8) if matrix_rows.dtype == bool else matrix_rows
+
+            # Define CUDA kernel launch parameters
+            threads_per_block = 256  # Common choice, can be tuned (e.g., 128, 256, 512)
+            # Calculate the number of blocks needed to cover all rows
+            blocks_per_grid = (num_rows + (threads_per_block - 1)) // threads_per_block
+        
+            print(f"  Launching Numba CUDA kernel for scan: {blocks_per_grid} blocks, {threads_per_block} threads/block")
+            scan_rows_kernel_for_gpu[blocks_per_grid, threads_per_block](
+                matrix_for_kernel, counts, num_cols
+            )
+            # Kernel launch is asynchronous by default. CuPy operations
+            # on 'counts' afterwards will implicitly synchronize, or you can explicitly sync.
+        else:
+            # Fallback for NumPy (or if GPU is not enabled/xp is not CuPy)
+            # This is the original loop which is efficient for NumPy.
+            # Ensure matrix_rows is int (0 or 1) for the multiplication trick.
+            matrix_int = matrix_rows.astype(int) # Ensure 0/1 for multiplication
+            counts[:, num_cols - 1] = matrix_int[:, num_cols - 1]
+            for i in range(num_cols - 2, -1, -1):
+                counts[:, i] = (counts[:, i + 1] + 1) * matrix_int[:, i]
+            
         return counts
 
     counts_r = _scan_runs_rowwise_left_to_right(region_mask)
