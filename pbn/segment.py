@@ -10,8 +10,11 @@ from skimage.feature import peak_local_max
 from typing import Optional
 
 _PBNPY_FORCE_NUMPY_ENV = os.environ.get("PBNPY_FORCE_NUMPY", "0").lower()
+print(f"DEBUG: _PBNPY_FORCE_NUMPY_ENV = {_PBNPY_FORCE_NUMPY_ENV}")
 FORCE_NUMPY_BACKEND = _PBNPY_FORCE_NUMPY_ENV in ("1", "true", "yes")
+print(f"DEBUG: FORCE_NUMPY_BACKEND = {FORCE_NUMPY_BACKEND}")
 
+exit()
 if FORCE_NUMPY_BACKEND:
     print("PBNPY_FORCE_NUMPY is set. Forcing NumPy backend in segment.py.")
     xp = np # Alias xp to numpy
