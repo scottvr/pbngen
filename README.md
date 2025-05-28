@@ -344,13 +344,13 @@ This generates a PBN for `landscape.png` with 20 final colors, where regions are
 
 Some operations are computationally-expensive enough that for a large and complex source image, no amount if CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. 
 
-If installed, PBNPy will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
+If installed, PbNgen will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
-As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+As already mentioned, you need to have a working CUDA installation on which to run PbNgen with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
 
 This link is to instructions that will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
-PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
+PbNgen will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
 
 Further, some of SciKit Learn's (sk-learn) functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked here. 
 
@@ -383,9 +383,9 @@ See these links for details:
 
 ## Credits
 
-PBNPy is the work of [scottvr](https://github.com/scottvr) and is a rewrite of some old bash, perl and ImageMagick voodoo I used to use to accomplish mostly the same, albeit without as good a resultant product. PBNPy is still undergoing active development so if you have a feature request or bug report, please let me know via Issues. If you have an ehancement, please send me a PR on Github.
+PbNgen is the work of [scottvr](https://github.com/scottvr) and is a rewrite of some old bash, perl and ImageMagick voodoo I used to use to accomplish mostly the same, albeit without as good a resultant product. PbNgen is still undergoing active development so if you have a feature request or bug report, please let me know via Issues. If you have an ehancement, please send me a PR on Github.
 
-The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PBNPy albeit in a different interface and without hardware acceleration or the ludicrous configurability of PBNPy. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
+The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PbNgen albeit in a different interface and without hardware acceleration or the ludicrous configurability of PbNgen. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
 
 The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was shown to me by [Gemini Alpha 2.5 Pro](https://gemini.google.com/).
 
