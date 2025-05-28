@@ -385,7 +385,7 @@ See these links for details:
 
 PBNPy is the work of [scottvr](https://github.com/scottvr) and is a rewrite of some old bash, perl and ImageMagick voodoo I used to use to accomplish mostly the same, albeit without as good a resultant product. PBNPy is still undergoing active development so if you have a feature request or bug report, please let me know via Issues. If you have an ehancement, please send me a PR on Github.
 
-The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PBNify albeit in a different interface and without hardware acceleration or the ludicrous configurability of PBNPy. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
+The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PBNPy albeit in a different interface and without hardware acceleration or the ludicrous configurability of PBNPy. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
 
 The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was shown to me by [Gemini Alpha 2.5 Pro](https://gemini.google.com/).
 
