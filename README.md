@@ -286,7 +286,7 @@ graph TD
         C
         D
     end
-    subgraph "Segmentation & Refinement"
+    subgraph "Segmentation"
         E
         F
     end
