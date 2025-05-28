@@ -301,7 +301,7 @@ As you can see, the vector representation (of segmented primitives) is the sourc
 
 -----
 
-## Experimental Features
+# Experimental Features
 
 ## Painterly Output with `--blobbify`
 
