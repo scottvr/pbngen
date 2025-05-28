@@ -215,13 +215,13 @@ To prepare your paint-by-number output for printing on a specific physical canva
 
 **Example:**
 
-To generate a paint-by-number that will be printed on a 12x16 inch canvas at 300 DPI:
+To generate a monochrome paint-by-number that will be printed on a 12x16 inch canvas at 300 DPI:
 
 ```bash
 python pbnpy.py my_image.jpg ./output_12x16 \
   --canvas-size "12x16in" \
   --dpi 300 \
-  --num-colors 1
+  --num-colors 2
 ```
 
 ### Label Modes (Placement Strategies)
