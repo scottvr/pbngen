@@ -10,7 +10,6 @@ from skimage.feature import peak_local_max
 from typing import Optional
 
 _PBNPY_FORCE_NUMPY_ENV = os.environ.get("PBNPY_FORCE_NUMPY", "0").lower()
-print(f"DEBUG: {_PBNPY_FORCE_NUMPY_ENV}")
 FORCE_NUMPY_BACKEND = _PBNPY_FORCE_NUMPY_ENV in ("1", "true", "yes")
 
 if FORCE_NUMPY_BACKEND:

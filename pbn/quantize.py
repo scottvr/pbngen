@@ -5,9 +5,6 @@ from pbn.palette_tools import map_image_to_palette
 import traceback
 
 
-
-
-
 def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None, pnginfo=None, dither=None):
     """
     Quantize image using either KMeans or a fixed palette.
