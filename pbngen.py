@@ -188,7 +188,7 @@ def pbn_cli(
     yes: bool = typer.Option(False, "--yes", "-y", help="Overwrite existing files."),
     interpolate_contours: bool = typer.Option(True, "--interpolate-contours/--no-interpolate-contours", help="Smooth contour lines. Default: True."),
     # --- Blobbify Options ---
-    blobbify: bool = typer.Option(False, "--blobbify", help="Split regions into 'blobs'."),
+    blobbify: bool = typer.Option(False, "--blobbify", "--blobify", help="Split regions into 'blobs'."),
     blob_min: int = typer.Option(3, "--blob-min", help="Min blob area in mm². Default: 3."),
     blob_max: int = typer.Option(30, "--blob-max", help="Max blob area in mm². Default: 30."),
     min_label_font: int = typer.Option(8, "--min-label-font", help="Min font size for blob labels. Default: 8."),
