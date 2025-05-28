@@ -396,7 +396,7 @@ The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGP
 The MIT License (MIT)
 =====================
 
-Copyright © `2025` `scotvr @ gmail.com`
+Copyright © `2025` `scottvr @ gmail.com`
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
