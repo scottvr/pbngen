@@ -230,6 +230,8 @@ python pbnpy.py my_image.jpg ./output_12x16 \
 -   `centroid`: Places a single label at the geometric center of each region. Best for simple, convex shapes.
 -   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but is significantly slower.
 
+-----
+
 ### Understanding `--bpp` vs `--num-colors`
 
 These two options control color reduction at different stages:
