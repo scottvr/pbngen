@@ -11,7 +11,7 @@ assignees: ''
 <!--
   Please read the documentation to the end
   and try a few settings before opening an Issue.
-  If you’ve done that and pbnpy still mis-renders,
+  If you’ve done that and pbngen still mis-renders,
   fill out the fields below and attach:
    1. The source image you ran.
    2. The exact command-line you used.
@@ -22,7 +22,7 @@ assignees: ''
 
 ## Steps to reproduce
 1. Command you ran:
-    `pbnpy --input my.png --palette ...`
+    `pbngen --input my.png --palette ...`
 2. Any special flags or settings:
 - `--tile-spacing=16`
 - `--label-mode=diagonal`
@@ -32,6 +32,6 @@ assignees: ''
 *(What did you expect the PBN canvas to look like?)*
 
 ## Environment
-- pbnpy version: `…`
+- pbngen version: `…`
 - Python: `…`
 - OS: `…`

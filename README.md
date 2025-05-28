@@ -1,6 +1,6 @@
-# PbnPy: Python Paint-By-Number Generator
+# PbnGen: Python Paint-By-Number Generator
 
-**PbnPy** is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
+**PbnGen** is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
 
 ## Features
 
@@ -34,13 +34,13 @@ The script is invoked directly, followed by options, the input image file, and t
 
 **General Syntax:**
 ```bash
-python pbnpy.py [OPTIONS] INPUT_FILE OUTPUT_DIRECTORY
+python pbngen.py [OPTIONS] INPUT_FILE OUTPUT_DIRECTORY
 ```
 
 ### Quick Start
 
 ```bash
-python pbnpy.py my_photo.jpg ./pbn_output
+python pbngen.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
 
@@ -49,7 +49,7 @@ See [Tips for Best Results](#tips-for-best-results) further down in this README.
 ### More Complex Example
 
 ```bash
-python pbnpy.py "Vacation Pic.png" "./Vacation PBN" \
+python pbngen.py "Vacation Pic.png" "./Vacation PBN" \
   --style mosaic \
   --bpp 8 \
   --num-colors 16 \
@@ -96,7 +96,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 - experiment; try both and see which gives better results
 - **likewise for the rest of the options below. Try a smaller font size. Try mixing and matching complexity presets with non-default font-size, tile-spacing, etc.**
 - Please read the documentation to the end and try a few settings before opening an Issue
-- If it really seems that pbnpy is failing to make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
+- If it really seems that pbngen is failing to make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
 
 -----
 
@@ -175,17 +175,17 @@ First, select a style with `--style <style_name>`, then optionally add its corre
 
 * To apply a blur with a radius of 7:
     ```bash
-    python pbnpy.py input.jpg ./output --style blur --blur-radius 7
+    python pbngen.py input.jpg ./output --style blur --blur-radius 7
     ```
 
 * To apply pixelation with a block size of 10 pixels:
     ```bash
-    python pbnpy.py input.jpg ./output --style pixelate --pixelate-block-size 10
+    python pbngen.py input.jpg ./output --style pixelate --pixelate-block-size 10
     ```
 
 * To apply the mosaic effect with its default (dynamically calculated) block size:
     ```bash
-    python pbnpy.py input.jpg ./output --style mosaic
+    python pbngen.py input.jpg ./output --style mosaic
     ```
 
 If you specify a style parameter flag (e.g., `--blur-radius`) without the corresponding `--style` flag (e.g., `--style blur`), the parameter flag will be ignored as no style is being applied. The parameter flags are only active when their associated style is selected.
@@ -218,7 +218,7 @@ To prepare your paint-by-number output for printing on a specific physical canva
 To generate a monochrome paint-by-number that will be printed on a 12x16 inch canvas at 300 DPI:
 
 ```bash
-python pbnpy.py my_image.jpg ./output_12x16 \
+python pbngen.py my_image.jpg ./output_12x16 \
   --canvas-size "12x16in" \
   --dpi 300 \
   --num-colors 2
@@ -326,7 +326,7 @@ Blobs that are too small to legibly fit a label (based on `--min-label-font`) ar
 ### Blobbify Example
 
 ```bash
-python pbnpy.py "landscape.png" "./landscape_pbn_blobs" \
+python pbngen.py "landscape.png" "./landscape_pbn_blobs" \
   --num-colors 20 \
   --blobbify \
   --blob-min 4 \
@@ -346,7 +346,7 @@ Some operations are computationally-expensive enough that for a large and comple
 
 If installed, PBNPy will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
-As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbnpy will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+As already mentioned, you need to have a working CUDA installation on which to run PBNPy with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
 
 This link is to instructions that will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
@@ -354,20 +354,20 @@ PBNPy will attempt to use the GPU if all prerequisites are met and CuPy is funct
 
 Further, some of SciKit Learn's (sk-learn) functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked here. 
 
-To get scikit-learn to use these accelerated functions you must wrap your pbnpy invocation with cuml like so: 
+To get scikit-learn to use these accelerated functions you must wrap your pbngen invocation with cuml like so: 
 
 ``` bash 
-python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...
+python -m cuml.accel pbngen.py input_file output_dir --your --args -here ...
 ``` 
 
 ### Running on Google Colab
 
 ``` jupyter
 % load_ext cuml.accel
-% !python pbnpy.py inputimage.png ./output_dir
+% !python pbngen.py inputimage.png ./output_dir
 ```
 
-There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbnpy doesn't yet gain a while lot just yet from this additional scikit acceleration, but after seeing a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
+There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbngen doesn't yet gain a while lot just yet from this additional scikit acceleration, but after seeing a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
 
 **Note Concerning CuML GPU Acceleration on Windows**
 

@@ -749,7 +749,7 @@ def collect_region_primitives(
     dynamic_min_area_for_font = (label_w_est * label_h_est) * 2.5
     dynamic_min_area_for_font = max(dynamic_min_area_for_font, 25)
     actual_min_filter_area = max(min_region_area, int(dynamic_min_area_for_font))
-    # typer.echo(...) for this info can be in pbnpy.py
+    # typer.echo(...) for this info can be in pbngen.py
 
     # --- Iterate through palette colors and then regions ---
     for idx, color_rgb_val in enumerate(palette): # Renamed 'color' to 'color_rgb_val'

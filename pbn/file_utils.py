@@ -35,10 +35,10 @@ def save_pbn_png(
     png_info = PngImagePlugin.PngInfo()
 
     if command_line_invocation:
-        png_info.add_text("pbnpy:command_line", command_line_invocation)
+        png_info.add_text("pbngen:command_line", command_line_invocation)
     
     # You could add other fixed metadata here too, e.g., software version
-    # png_info.add_text("Software", "pbnpy vX.Y.Z")
+    # png_info.add_text("Software", "pbngen vX.Y.Z")
 
     if additional_metadata:
         for key, value in additional_metadata.items():
@@ -49,5 +49,5 @@ def save_pbn_png(
         # typer.echo(f"Saved PNG with metadata: {output_path.name}") # Optional: for verbose output
     except Exception as e:
         # Consider how to handle errors, e.g., log them or raise them
-        # For CLI, typer.secho might be appropriate if this function is in pbnpy.py
+        # For CLI, typer.secho might be appropriate if this function is in pbngen.py
         print(f"Error saving PNG {output_path}: {e}") # Or use typer.secho
