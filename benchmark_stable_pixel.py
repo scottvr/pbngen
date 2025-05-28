@@ -10,9 +10,9 @@ except ImportError as e:
     exit()
 
 # ---- Configuration ----
-N_ITERATIONS = 10  
-HEIGHT = 10000       
-WIDTH = 10000        
+N_ITERATIONS = 100 
+HEIGHT = 1000       
+WIDTH = 1000        
 # DENSITY = 0.5     # control density with xp.random.rand, not used with randint(0,2)
 
 def run_benchmark():
