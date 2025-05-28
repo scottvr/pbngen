@@ -364,7 +364,7 @@ python -m cuml.accel pbnpy.py input_file output_dir --your --args -here ...
 
 ``` jupyter
 % load_ext cuml.accel
-% python pbnpy.py inputimage.png ./output_dir
+% !python pbnpy.py inputimage.png ./output_dir
 ```
 
 There is a nice and easy [notebook here](https://colab.research.google.com/github/rapidsai-community/showcase/blob/main/getting_started_tutorials/rapids-pip-colab-template.ipynb) that will get you up and running quickly without all of the hassle that goes along with getting a working nvidia dev environment (which is especially sticky on Windows.) Unfortunately, pbnpy doesn't yet gain a while lot just yet from this additional scikit acceleration, but after seeing a 50x improvement in the stable placement algorithm after parallelizing and making the code use cupy if available, I am eager to see how much more there may be to gain with cuml.
