@@ -5,7 +5,7 @@ import os
 import typer # for typer.echo
 import math
 
-def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, brush_step=None,  num_brushes=None, fervor=None, focus=None):
+def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, brush_step=None, brush_size=None, edge_strength=None, num_brushes=None, fervor=None, focus=None):
     """
     Applies a specified visual style to an input image and saves the output.
 
