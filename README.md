@@ -283,6 +283,8 @@ graph TD
     end
 ```
 
+As you can see, the vector representation is the source for the raster, so eliding it won't save any time. 
+
 ## Painterly Output with `--blobbify`
 
 The `--blobbify` feature allows for a more artistic, "painterly" result by subdividing large, uniform color regions into smaller, more organically shaped "blobs." This can simulate the appearance of individual brushstrokes.
