@@ -260,7 +260,7 @@ If `--palette-from MY_PALETTE.PNG` is also used with `--bpp 8` and `--num-colors
 `MY_PALETTE.PNG` → `INTERMEDIATE_PALETTE_SOURCE (256 colors)`
   Then, 16 colors are extracted from `INTERMEDIATE_PALETTE_SOURCE` and used to quantize `INTERMEDIATE_INPUT` to the `FINAL_PBN_IMAGE (16 colors)`.
 
-# How it works
+# How it works (Big Picture)
 
 ### Pipeline Diagram
 
@@ -300,7 +300,7 @@ As you can see, the vector representation is the source for the raster, so elidi
 
 -----
 
-## Exoerimental Features
+## Experimental Features
 
 ## Painterly Output with `--blobbify`
 
