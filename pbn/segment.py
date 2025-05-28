@@ -255,7 +255,6 @@ def make_label(x, y, value, font_size, region_area):
         "region_area": region_area
     }
 
-# --- Helper for Bounding Box Overlap (already included by you) ---
 def do_bboxes_overlap(box1: tuple[float, float, float, float],
                       box2: tuple[float, float, float, float],
                       margin: float = 1.0) -> bool:
