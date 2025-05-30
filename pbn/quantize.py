@@ -5,7 +5,7 @@ from pbn.palette_tools import map_image_to_palette
 import traceback
 
 
-def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None, pnginfo=None, dither=None):
+def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None, pnginfo=None, dither=None, sort_by_frequency:bool=True):
     """
     Quantize image using either KMeans or a fixed palette.
     The returned palette is sorted by color frequency in the image (most frequent first).
@@ -34,6 +34,8 @@ def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None,
     # This will hold the palette whose colors need to be frequency-sorted
     palette_to_analyze: np.ndarray
 
+    final_palette_to_return: np.ndarray
+
     if fixed_palette is not None:
         # map_image_to_palette returns an image with pixels mapped to colors from fixed_palette
         quantized_rgb_array = map_image_to_palette(img_data_np, fixed_palette)
@@ -49,35 +51,28 @@ def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None,
         quantized_rgb_array = palette_from_kmeans[labels].reshape(img_data_np.shape)
         palette_to_analyze = palette_from_kmeans
 
-    # Count frequencies of each color from palette_to_analyze in the quantized_rgb_array
-    # 1. Get unique colors and their counts from the actual quantized image
-    unique_colors_in_image, counts_for_unique_colors = np.unique(
-        quantized_rgb_array.reshape(-1, 3), axis=0, return_counts=True
-    )
-    # 2. Create a map for quick lookup of counts for these unique colors
-    color_to_actual_count_map = {
-        tuple(color): count for color, count in zip(unique_colors_in_image, counts_for_unique_colors)
-    }
-
-    # 3. For each color in our target palette (palette_to_analyze), find its count
-    palette_with_counts = []
-    for i, color_in_palette in enumerate(palette_to_analyze):
-        count = color_to_actual_count_map.get(tuple(color_in_palette), 0)
-        palette_with_counts.append({
-            'color_rgb': color_in_palette,    # Keep as np.array for easy reconstruction
-            'original_index': i,              # In case it's ever needed
-            'count': count
-        })
+    if sort_by_frequency:
+        # --- This is your existing frequency counting and sorting logic ---
+        unique_colors_in_image, counts_for_unique_colors = np.unique(
+            quantized_rgb_array.reshape(-1, 3), axis=0, return_counts=True
+        )
+        color_to_actual_count_map = {
+            tuple(color): count for color, count in zip(unique_colors_in_image, counts_for_unique_colors)
+        }
+        palette_with_counts = []
+        for i, color_in_palette in enumerate(palette_to_analyze): # palette_to_analyze is from K-Means or fixed_palette
+            count = color_to_actual_count_map.get(tuple(color_in_palette), 0)
+            palette_with_counts.append({'color_rgb': color_in_palette, 'count': count})
+        
+        sorted_palette_entries = sorted(palette_with_counts, key=lambda x: x['count'], reverse=True)
+        final_palette_to_return = np.array([entry['color_rgb'] for entry in sorted_palette_entries], dtype=np.uint8)
+        # --- End of frequency sorting logic ---
+    else:
+        # Use the palette in the order it came from the quantizer (KMeans or fixed_palette)
+        final_palette_to_return = palette_to_analyze.astype(np.uint8) # Ensure dtype
     
-    # 4. Sort these palette entries by count in descending order
-    # Python's sort is stable, so original relative order of colors with same count is preserved.
-    sorted_palette_entries = sorted(palette_with_counts, key=lambda x: x['count'], reverse=True)
-    
-    # 5. Construct the final sorted palette to be returned
-    final_sorted_palette = np.array([entry['color_rgb'] for entry in sorted_palette_entries], dtype=np.uint8)
-
     # Save the quantized image (its pixel values are RGB based on the original quantization)
     quantized_pil_image_output = Image.fromarray(quantized_rgb_array)
     quantized_pil_image_output.save(output_path, pnginfo=pnginfo) # Pass pnginfo if provided
-
+    
     return final_sorted_palette

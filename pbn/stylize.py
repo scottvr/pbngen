@@ -37,6 +37,14 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         styled_image = image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
         styled_image.save(output_path)
 
+    elif style == "smooth":
+        styled_image = image.filter(ImageFilter.SMOOTH)
+        styled_image.save(output_path)
+        
+    elif style == "smooth_more":
+        styled_image = image.filter(ImageFilter.SMOOTH_MORE)
+        styled_image.save(output_path)
+
     elif style == "pixelate":
         actual_block_size = pixelate_block_size if pixelate_block_size is not None else 10
         img_small = image.resize((image.width // actual_block_size, image.height // actual_block_size), Image.Resampling.BILINEAR)
@@ -265,8 +273,57 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         # `actual_blur_radius` here is the one from the very first brush pass's setup in your original code.
         styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=max(1, base_blur_radius // 2))) # e.g., a smaller finishing blur
         styled_image.save(output_path)
+
+    elif style == "test-orig":
+        w, h = image.size
+        image_array = np.array(image)
+        
+        # temp hardcode:
+        actual_num_brushes = num_brushes if num_brushes is not None else 2
+        actual_num_brushes = min(actual_num_brushes, 3) # clamp to three brushes for now
+        actual_brush_size = brush_size if brush_size is not None else 3
+        brush_step = 4 
+        intensity = 1
+
+        enhancer = ImageEnhance.Contrast(image)
+        for idx in range(0, actual_num_brushes):
+            bs = actual_brush_size - idx * brush_step
+            actual_blur_radius = blur_radius if blur_radius is not None else 4
+            intensity = intensity if intensity is not None else 1
+            image = enhancer.enhance(1.2)  # Increase contrast by 50%
+            image = image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
+            
+            for _ in range(w * h // (actual_brush_size**2) * int(intensity)):
+                x = random.randint(0, w - 1)
+                y = random.randint(0, h - 1)
+            
+                # Get the color of the pixel
+                r, g, b = image.getpixel((x, y))
+                # Apply brush strokes around the pixel
+                for i in range(max(0, x - actual_brush_size // 2), min(w, x + actual_brush_size // 2 + 1)):
+                    for j in range(max(0, y - actual_brush_size // 2), min(h, y + actual_brush_size // 2 + 1)):
+                        dx = i - x
+                        dy = j - y
+                        if dx**2 + dy**2 <= (actual_brush_size // 2)**2:
+                            # Calculate new color values with random variation
+                            new_r_float = r + random.uniform(-20, 20)
+                            new_g_float = g + random.uniform(-20, 20)
+                            new_b_float = b + random.uniform(-20, 20)
+            
+                            # Clamp the values to the valid uint8 range [0, 255]
+                            clamped_r = max(0, min(255, int(new_r_float)))
+                            clamped_g = max(0, min(255, int(new_g_float)))
+                            clamped_b = max(0, min(255, int(new_b_float)))
+         
+                            # Assign the clamped color tuple
+                            # Assuming you've made the fix image_array[j, i]
+                            image_array[j, i] = (clamped_r, clamped_g, clamped_b)        
+        styled_image = Image.fromarray(image_array)
+        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
+        styled_image.save(output_path)    
     else:
-        raise ValueError(f"Unknown style: {style}. Supported styles: blur, pixelate, mosaic, impressionist, test.")
+        raise ValueError(f"Unknown style: {style}. Supported styles: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more.")
 
 if __name__ == '__main__':
     import traceback

@@ -115,6 +115,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
 | `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
 | `--palette-from FILE_PATH`    | Path to an image to extract a fixed palette from for the final PBN colors. This image is also subject to `--bpp` pre-quantization.        | `None`         |
+| `--no-frequency-sort-palette`    | Do not sort the PBN palette by frequency | Default is to sort palette     |
 | `--font-path FILE_PATH`       | Path to a `.ttf` font file for labels and legend.                                                                                         | System default |
 | `--font-size INTEGER`         | Base font size for overlay labels and legend text.                                                                                        | 12             |
 | `--label_strategy TEXT`           | Label placement strategy: `diagonal`, `centroid`, `stable`.                                                                               | `diagonal`     |

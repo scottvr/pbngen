@@ -116,6 +116,11 @@ def pbn_cli(
         None, "--palette-from", help="Path to image to extract fixed palette from.",
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
     ),
+        frequency_sort_palette: bool = typer.Option(
+        True, 
+        "--frequency-sort-palette/--no-frequency-sort-palette", # Standard Typer bool flag
+        help="Sort the PBN palette by color frequency (most used first). Use --no-frequency-sort-palette for original quantizer order."
+    ),
     canvas_size_str: Optional[str] = typer.Option(
         None, "--canvas-size",
         help="Desired physical canvas size (e.g., '10x8in', '29.7x21cm'). Uses DPI from --dpi."
@@ -130,7 +135,7 @@ def pbn_cli(
     ),
     # --- Style Options ---
     style: Optional[str] = typer.Option(
-        None, "--style", help="Optional style: blur, pixelate, mosaic, impressionist."
+        None, "--style", help="Optional style: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more."
     ),
     blur_radius: Optional[int] = typer.Option(
         None, "--blur-radius", min=1,
