@@ -44,6 +44,8 @@ python pbngen.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
 
+[A Basic Example complete with input and output images is available on the Wiki](https://github.com/scottvr/pbngen/wiki/Basic-Example) 
+
 See [Tips for Best Results](#tips-for-best-results) further down in this README.
 
 ### More Complex Example
@@ -346,7 +348,7 @@ Some operations are computationally-expensive enough that for a large and comple
 
 If installed, PbNgen will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
-As already mentioned, you need to have a working CUDA installation on which to run PbNgen with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+As already mentioned, you need to have a working CUDA installation on which to run PbNgen with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your image naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
 
 This link is to instructions that will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
@@ -387,7 +389,7 @@ PbNgen is the work of [scottvr](https://github.com/scottvr) and is a rewrite of 
 
 The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PbNgen albeit in a different interface and without hardware acceleration or the ludicrous configurability of PbNgen. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
 
-The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to accomplish this.
+The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to [accomplish this](https://github.com/scottvr/pbngen/wiki/Paralellizing-the-Stable-Label-Locator).
 
 The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai). Thank ya, boys!
 
