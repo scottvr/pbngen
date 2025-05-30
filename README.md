@@ -389,7 +389,7 @@ PbNgen is the work of [scottvr](https://github.com/scottvr) and is a rewrite of 
 
 The stable label ranking algorithm was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PbNgen albeit in a different interface and without hardware acceleration or the ludicrous configurability of PbNgen. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
 
-The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to accomplish this.
+The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to [https://github.com/scottvr/pbngen/wiki/Paralellizing-the-Stable-Label-Locator](accomplish this).
 
 The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai). Thank ya, boys!
 
