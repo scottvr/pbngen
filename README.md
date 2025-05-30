@@ -44,7 +44,7 @@ python pbngen.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
 
-[A Basic Example complete with input and output images is available on the Wiki](https://github.com/scottvr/pbngen/wiki/Basic-Example) 
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki) 
 
 See [Tips for Best Results](#tips-for-best-results) further down in this README.
 
