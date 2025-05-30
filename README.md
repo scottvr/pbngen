@@ -348,7 +348,7 @@ Some operations are computationally-expensive enough that for a large and comple
 
 If installed, PbNgen will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
-As already mentioned, you need to have a working CUDA installation on which to run PbNgen with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your inage naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
+As already mentioned, you need to have a working CUDA installation on which to run PbNgen with acceleration, along with cupy in the environment where pbngen will run.  If you want to run blobbify on an image of any sort of large input or output canvas size, or if your image naturally has many small regions of colors, you may find that CPU-only version is too painfully slowto bear.
 
 This link is to instructions that will help you get it set up if you need it: [Official CuPy Installation Guide](https://docs.cupy.dev/en/stable/install.html)
 
