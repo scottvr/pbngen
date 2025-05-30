@@ -149,7 +149,7 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         styled_image.save(output_path)
 
         
-    elif style=="test":
+    elif style=="painterly-med":
         w, h = image.size
         image_array = np.array(image)
 
@@ -200,7 +200,7 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         styled_image = ImageOps.posterize(styled_image, 4)
         styled_image.save(output_path)
 
-    elif style=="test2":
+    elif style=="painterly-hi":
         w, h = image.size
         
         # Parameters for the style (these should come from apply_style args or have defaults)
@@ -274,7 +274,7 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=max(1, base_blur_radius // 2))) # e.g., a smaller finishing blur
         styled_image.save(output_path)
 
-    elif style == "test-orig":
+    elif style == "painterly-lo":
         w, h = image.size
         image_array = np.array(image)
         
