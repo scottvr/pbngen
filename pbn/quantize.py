@@ -75,4 +75,4 @@ def quantize_image(input_path, output_path, num_colors=None, fixed_palette=None,
     quantized_pil_image_output = Image.fromarray(quantized_rgb_array)
     quantized_pil_image_output.save(output_path, pnginfo=pnginfo) # Pass pnginfo if provided
     
-    return final_sorted_palette
+    return final_palette_to_return
