@@ -93,6 +93,28 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 
  **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.**
 
+### Embedded File Metadata
+
+PBNgen automatically embeds useful metadata directly into the output PNG and SVG files it generates. This feature helps you keep track of precisely how each file was created, making it easier to manage different versions or reproduce results without relying on complex filenames or separate notes.
+
+**What Information is Stored?**
+
+For each generated PNG and SVG file, PBNgen typically embeds:
+
+* **Full Command-Line Invocation:** The exact command, options, and arguments you used to run `pbngen` for that specific file. This is stored with a key like `pbngen:command_line` (PNG) or in a `CommandLineInvocation` tag (SVG).
+* **Processing Details:** Context-specific information about the generation process. This can include:
+    * `PBNgen-FileType`: The role of the generated file (e.g., "Labeled Raster PBN Output", "Vector PBN Canvas", "BPP Pre-quantized Input").
+    * Source file paths (e.g., `SourceImage`, `SourceQuantizedGuide`).
+    * Key parameters used (e.g., `PaletteColors`, `BPP`, `TargetCanvasSize`, `LabelStrategy`, `FontSize`).
+    * Other relevant settings.
+
+**How and Where Metadata is Stored:**
+
+* **PNG Files:** Metadata is embedded as text chunks within the PNG file structure. Keys for this information are generally prefixed with `pbngen:` (e.g., `pbngen:PBNgen-FileType`). You can often view these text chunks using metadata inspection tools like `exiftool` or some advanced image editors.
+* **SVG Files:** Metadata is stored within a standard `<metadata>` block inside the SVG XML structure. Custom PBNgen-specific elements (like `PBNgen_FileType`, `PaletteColors`, etc.) are namespaced using the URI `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#`. This means each custom metadata tag will typically have an `xmlns` attribute pointing to this URI when serialized by `xml.etree.ElementTree`. You can view this metadata by opening the SVG file in a text editor or an XML-aware SVG editor.
+
+This embedded metadata ensures that crucial information about the provenance and generation parameters of your PBNgen assets is self-contained within the files themselves, promoting better organization and reproducibility.
+
 ## Tips for Best Results
 
 - for complex images, `--filter blur` almost always helps a ton.

@@ -47,7 +47,6 @@ def save_pbn_png(
         image_to_save.save(output_path, "PNG", pnginfo=png_info)
     except Exception as e:
         print(f"Error saving PNG {output_path}: {e}")
-
 def save_pbn_svg(
     output_path: Path,
     canvas_size: Tuple[int, int],
@@ -64,20 +63,22 @@ def save_pbn_svg(
     """
     width, height = canvas_size
 
-    pbngen_ns_uri = 'http://www.github.com/scottvr/pbngen/pbngen-ns#'
-    pbngen_ns_prefix = 'pbngen'
+    # The namespace URI for your custom metadata elements
+    pbngen_ns_uri = '[http://www.github.com/scottvr/pbngen/assets/ns/pbngen#](http://www.github.com/scottvr/pbngen/assets/ns/pbngen#)' 
+    # The prefix 'pbngen' is not strictly needed for ElementTree tag creation
+    # if using default namespaces on elements, but the URI is crucial.
 
-    # Initialize drawing WITHOUT the custom xmlns in the constructor's **extra
     dwg = svgwrite.Drawing(
         str(output_path),
         size=(f"{width}px", f"{height}px"),
         profile='full'
     )
 
-    # Add the custom namespace declaration directly to the root svg element's attributes
-    dwg.attribs[f'xmlns:{pbngen_ns_prefix}'] = pbngen_ns_uri
+    # REMOVED: dwg.attribs[f'xmlns:{pbngen_ns_prefix}'] = pbngen_ns_uri
+    # We will not attempt to add xmlns:pbngen to the root <svg> element directly
+    # to avoid the svgwrite validator issue.
 
-    # --- Font embedding logic
+    # --- Font embedding logic ---
     font_family_svg = "sans-serif"
     if font_path_str:
         try:
@@ -109,8 +110,8 @@ def save_pbn_svg(
         metadata_root_element.set('id', 'pbngenApplicationMetadata')
 
         if command_line_invocation:
-            # Use the prefixed name for the custom element
-            cli_el = SubElement(metadata_root_element, f'{pbngen_ns_prefix}:CommandLineInvocation')
+            # Use the {URI}LocalName format for ElementTree tag creation
+            cli_el = SubElement(metadata_root_element, f'{{{pbngen_ns_uri}}}CommandLineInvocation')
             cli_el.text = command_line_invocation
         
         if additional_metadata:
@@ -120,14 +121,14 @@ def save_pbn_svg(
                 if not el_name_local or not (el_name_local[0].isalpha() or el_name_local[0] == '_'):
                     el_name_local = '_' + el_name_local
                 
-                # Use the prefixed name for the custom element
-                qualified_name = f'{pbngen_ns_prefix}:{el_name_local}'
-                meta_item_el = SubElement(metadata_root_element, qualified_name)
+                # Use the {URI}LocalName format for ElementTree tag creation
+                meta_item_el = SubElement(metadata_root_element, f'{{{pbngen_ns_uri}}}{el_name_local}')
                 meta_item_el.text = str(value)
         
         dwg.elements.append(metadata_root_element)
     # --- End Metadata block ---
 
+    # --- Drawing primitives ---
     dwg.add(dwg.rect(insert=(0, 0), size=(f"{width}px", f"{height}px"), fill='white', stroke='gray', stroke_width=1))
 
     for item in primitives:
@@ -138,8 +139,9 @@ def save_pbn_svg(
         for label in item.get("labels", []):
             x, y = label["position"]
             font_size_label = label.get("font_size", default_font_size if default_font_size else 10)
-            dwg.add(dwg.text(str(label["value"]), insert=(int(x), int(y)), fill=label_color_str,
-                             font_family=font_family_svg, font_size=f"{font_size_label}px",
-                             text_anchor="middle", alignment_baseline="middle"))
+            dwg.add(dwg.text(str(label["value"]), insert=(int(x), int(y)), fill=label_color_str, #
+                             font_family=font_family_svg, font_size=f"{font_size_label}px", #
+                             text_anchor="middle", alignment_baseline="middle")) #
+    # --- End Drawing primitives ---
     
     dwg.save()
