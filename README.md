@@ -326,6 +326,10 @@ As you can see, the vector representation (of segmented primitives) is the sourc
 
 -----
 
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
+
+----
+
 # Experimental Features
 
 ## Painterly Output with `--blobbify`
