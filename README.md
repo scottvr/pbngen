@@ -8,7 +8,7 @@ The **LeadEngine** (aka [Pb](https://wikipedia.com/wiki/lead)Ngen, that's "lead"
 - Two-stage color quantization:
     - Optional initial global color reduction using Bits Per Pixel (`--bpp`).
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
-- Style preprocessing: `blur`, `pixelate`, `mosaic`, painterly and smoothing filters
+- Filter preprocessing: `blur`, `pixelate`, `mosaic`, painterly and smoothing filters
 - Complexity presets for beginner to master-level detail.
 - Label placement strategies: `diagonal`, `centroid`, `stable`.
 - Custom font support for overlays and legend.
@@ -142,7 +142,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `master`     | 24         | 20px         | 10        |
 *(These presets set defaults; explicit options like `--num-colors` will override them.)*
 
-### Style Options
+### Filter Options
 
 | Name       | Description                              |
 |------------|------------------------------------------|
