@@ -279,7 +279,7 @@ python pbngen.py my_image.jpg ./output_12x16 \
 
 -   `diagonal` (default, or set by preset): Fast, places labels on a diagonal grid within regions. Can sometimes be dense.
 -   `centroid`: Places a single label at the geometric center of each region. Best for simple, convex shapes.
--   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but is significantly slower.
+-   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but in very crowded/dense pbn canvases, a single label can be difficult to see. 
 
 -----
 
