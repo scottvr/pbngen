@@ -1,6 +1,6 @@
 # PbNgen: the Python Paint-By-Number Generator
 
-[Pb](https://wikipedia.com/wiki/lead)Ngen, (that's PbN as in paint-by-numbers, gen as in generator. Or Pb as in "lead" as in painti, and Ngen as in engine; one might call it The LeadEngine, but I don't expect anyone to call it anything other than pbngen) is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
+[Pb](https://wikipedia.com/wiki/lead)Ngen, (that's PbN as in paint-by-numbers, gen as in generator. Or Pb as in "lead" as in paint, and Ngen as in engine; one might call it The LeadEngine, but I don't expect anyone to call it anything other than pbngen) is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
 
 ## Features
 
@@ -99,6 +99,8 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 - **likewise for the rest of the options below. Try a smaller font size. Try mixing and matching complexity presets with non-default font-size, tile-spacing, etc.**
 - Please read the documentation to the end and try a few settings before opening an Issue
 - If it really seems that pbngen can't make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
+
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
 
 -----
 
@@ -325,6 +327,10 @@ graph TD
 As you can see, the vector representation (of segmented primitives) is the source for the raster image, so eliding SVG output it won't save any noticeable time.
 
 -----
+
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
+
+----
 
 # Experimental Features
 
