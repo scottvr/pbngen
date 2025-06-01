@@ -6,10 +6,11 @@ import base64 # For embedding font
 def write_svg(
     output_path: str,
     canvas_size: Tuple[int, int],
-    primitives: List[dict], # More specific type hint
-    font_path_str: Optional[str] = None, # Added
-    default_font_size: Optional[int] = 10, # Added, though label["font_size"] is primary
-    label_color_str: Optional[str] = "#88ddff" # <-- ADDED: Default to black
+    primitives: List[dict], 
+    font_path_str: Optional[str] = None, 
+    default_font_size: Optional[int] = 10, 
+    label_color_str: Optional[str] = "#88ddff",
+    outline_color_hex: str = "#88ddff" 
 ):
     """
     Render collected drawing primitives into an SVG file with optional debugging.
