@@ -52,7 +52,7 @@ def write_svg(
                     font_face_css += f"font-family: '{font_family_svg}';"
                     font_face_css += f"src: url(data:{font_mime_type};base64,{font_data_b64});"
                     font_face_css += f"}}"
-                    dwg.defs.add(dwg.filter(font_face_css)) # Corrected this line, was dwg.defs.add(dwg.style(font_face_style))
+                    dwg.defs.add(dwg.filter(font_face_css)) 
                 except Exception as e:
                     print(f"Warning: Could not embed font {font_path_str} into SVG: {e}")
                     # Fallback to using font_family_svg name, assuming it might be installed
