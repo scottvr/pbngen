@@ -345,32 +345,73 @@ def interpolate_contour(contour: list[tuple[float,float]], step: float = 0.5) ->
     dense.append(contour[-1])
     return dense
 
-def render_raster_from_primitives(canvas_size: tuple[int,int], primitives: list[dict],
-                                  font_path: Optional[Path] = None, 
-                                  additional_nudge_pixels_up: float = 0.0) -> Image.Image:
+def render_raster_from_primitives(
+    canvas_size: tuple[int, int],
+    primitives: list[dict],
+    font_path: Optional[Path] = None,
+    additional_nudge_pixels_up: float = 0.0,
+    label_text_color: str = "#88ddff",
+    outline_color_str_hex: str = "#88ddff"
+) -> Image.Image:
     width, height = canvas_size
     output_img = Image.new("RGB", (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(output_img)
-    pbn_color = (102, 204, 255)
+    
+    # Convert hex string outline color to RGB tuple for Pillow
+    try:
+        outline_render_color_rgb = ImageColor.getrgb(outline_color_str_hex)
+    except ValueError:
+        # Fallback if the color string is invalid (though Typer might catch some upstream)
+        print(f"Warning: Invalid outline color string '{outline_color_str_hex}' for raster. Defaulting to blue.")
+        outline_render_color_rgb = (102, 204, 255) # Original hardcoded blue
+
     font_path_str = str(font_path) if font_path else None
 
     for region_primitive in primitives:
+        # Draw outlines
         for contour_points_list in region_primitive.get("outline", []):
             if len(contour_points_list) > 1:
-                 draw.line(contour_points_list, fill=pbn_color, width=1)
+                 draw.line(contour_points_list, fill=outline_render_color_rgb, width=1) # <-- USE CONVERTED RGB TUPLE
             elif contour_points_list:
-                 draw.point(contour_points_list[0], fill=pbn_color)
+                 draw.point(contour_points_list[0], fill=outline_render_color_rgb)        
+
+        # Draw text labels
         for label_data in region_primitive["labels"]:
             default_render_font_size = label_data.get("font_size", 10) 
             font_to_use = get_font_for_label(label_data, font_path_str, default_render_font_size)
             lx, ly = label_data["position"]
             text_value = str(label_data["value"])
-            effective_y_for_anchor = float(ly) - additional_nudge_pixels_up
+            
+            # This is the y-coordinate around which "mm" anchor should center vertically
+            effective_y_center_for_anchor = float(ly) - additional_nudge_pixels_up 
+            
             try:
-                draw.text((float(lx), effective_y_for_anchor), text_value,
-                          font=font_to_use, fill=pbn_color, anchor="mm")
-            except (TypeError, AttributeError, ValueError):
-                draw.text((float(lx), float(ly)), text_value, font=font_to_use, fill=pbn_color)
+                # Attempt to use "mm" (middle-middle) anchor if available
+                draw.text((float(lx), effective_y_center_for_anchor), text_value,
+                          font=font_to_use, fill=label_text_color, anchor="mm") # <-- USE label_text_color
+            except (TypeError, AttributeError, ValueError): # Fallback for older Pillow or if anchor="mm" fails
+                # Manually calculate position to simulate middle anchor
+                text_width, text_height = 0, 0
+                try: # Try getbbox first (Pillow 9.2.0+)
+                    bbox_pil = font_to_use.getbbox(text_value)
+                    text_width = bbox_pil[2] - bbox_pil[0]
+                    text_height = bbox_pil[3] - bbox_pil[1]
+                except AttributeError: # Fallback to textbbox (older Pillow)
+                    try:
+                        bbox_pil = draw.textbbox((0,0), text_value, font=font_to_use) # x,y don't matter for textbbox for size
+                        text_width = bbox_pil[2] - bbox_pil[0]
+                        text_height = bbox_pil[3] - bbox_pil[1]
+                    except AttributeError: # Ultimate fallback if font methods fail
+                         font_sz_fallback = label_data.get("font_size", 10)
+                         text_width = font_sz_fallback * len(text_value) * 0.6 # Rough estimate
+                         text_height = font_sz_fallback # Rough estimate
+                
+                # Calculate top-left for drawing
+                draw_x = float(lx) - (text_width / 2.0)
+                draw_y = effective_y_center_for_anchor - (text_height / 2.0)
+                
+                draw.text((draw_x, draw_y), text_value,
+                          font=font_to_use, fill=label_text_color) # <-- USE label_text_color
     return output_img
 
 def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fixed_font_size, interpolate_contours=True):

@@ -8,7 +8,8 @@ def write_svg(
     canvas_size: Tuple[int, int],
     primitives: List[dict], # More specific type hint
     font_path_str: Optional[str] = None, # Added
-    default_font_size: Optional[int] = 10 # Added, though label["font_size"] is primary
+    default_font_size: Optional[int] = 10, # Added, though label["font_size"] is primary
+    label_color_str: Optional[str] = "#88ddff" # <-- ADDED: Default to black
 ):
     """
     Render collected drawing primitives into an SVG file with optional debugging.
@@ -46,11 +47,11 @@ def write_svg(
                     elif font_path_obj.suffix.lower() == ".woff2":
                         font_mime_type = "font/woff2"
 
-                    filter_def = f"@font-face {{"
-                    filter_def += f"font-family: '{font_family_svg}';"
-                    filter_def += f"src: url(data:{font_mime_type};base64,{font_data_b64});"
-                    filter_def += f"}}"
-                    dwg.defs.add(dwg.filter(filter_def))
+                    font_face_css = f"@font-face {{"
+                    font_face_css += f"font-family: '{font_family_svg}';"
+                    font_face_css += f"src: url(data:{font_mime_type};base64,{font_data_b64});"
+                    font_face_css += f"}}"
+                    dwg.defs.add(dwg.filter(font_face_css)) # Corrected this line, was dwg.defs.add(dwg.style(font_face_style))
                 except Exception as e:
                     print(f"Warning: Could not embed font {font_path_str} into SVG: {e}")
                     # Fallback to using font_family_svg name, assuming it might be installed
@@ -63,30 +64,23 @@ def write_svg(
     # Optional debug box to visualize canvas bounds
     dwg.add(dwg.rect(insert=(0, 0), size=(f"{width}px", f"{height}px"), fill='white', stroke='gray', stroke_width=1))
 
-    outline_color = "#88ddff"  
-    label_color = "#88ddff"
-
     for item in primitives:
         # Draw outlines
         for contour in item.get("outline", []):
-            # Ensure points are within canvas, primarily a safeguard
             filtered_points = []
             for x_coord, y_coord in contour:
-                # Clamp coordinates to be within canvas, though ideally they should be.
-                # SVG can handle points outside, but it's good practice.
-                # For PBN, exact outline is important.
                 clamped_x = max(0, min(int(x_coord), width))
                 clamped_y = max(0, min(int(y_coord), height))
                 filtered_points.append((clamped_x, clamped_y))
             
-            if filtered_points and len(filtered_points) > 1: # Need at least 2 points for a polyline
+            if filtered_points and len(filtered_points) > 1:
                 dwg.add(dwg.polyline(
                     points=filtered_points,
-                    stroke=outline_color,
+                    stroke=outline_color_hex, 
                     fill="none",
                     stroke_width=1
                 ))
-
+        
         # Draw text labels
         for label in item.get("labels", []):
             x, y = label["position"]
@@ -104,7 +98,7 @@ def write_svg(
             dwg.add(dwg.text(
                 str(label["value"]), # Ensure value is string
                 insert=(int(x), int(y)),
-                fill=label_color,
+                fill=label_color_str, # <-- MODIFIED: Use the new label_color_str parameter
                 # stroke=label_color, # Usually not needed if fill is present, can make text look thicker
                 font_family=font_family_svg, # Apply the determined font family
                 font_size=f"{font_size_label}px", # Add units

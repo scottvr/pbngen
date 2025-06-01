@@ -174,13 +174,21 @@ def pbn_cli(
     help="Labeling strategy for small regions: stable, centroid, none. Default: stable."
     ),
     min_scaling_font_size_cli: Optional[int] = typer.Option(
-        None, "--min-scaling-font-size", min=1,
+        None, "--min-scaling-font-size", min=4,
         help="Minimum font size for labels when iterative scaling is applied (stable strategy). Default: 6."
     ),
     enable_stable_font_scaling_cli: bool = typer.Option( # New CLI flag
         False,
         "--enable-stable-font-scaling",
         help="Enable iterative font scaling for 'stable' label placement strategy."
+    ),
+    label_color: Optional[str] = typer.Option(
+        "#000000", "--label-color", help="Color for text labels in SVG and raster (e.g., '#FF0000' or 'red'). Default: '#000000' (black)."
+    ),
+    outline_color_cli: str = typer.Option( # <-- NEW CLI OPTION FOR OUTLINE COLOR
+        "#88ddff", # Default hex color, matching previous hardcoded value
+        "--outline-color",
+        help="Color for PBN outlines in SVG and raster (e.g., '#88ddff' or 'lightblue'). Default: '#88ddff'."
     ),
     # --- Legend Options ---
     swatch_size: int = typer.Option(40, "--swatch-size", min=10, help="Legend swatch size. Default: 40px."),
@@ -226,6 +234,7 @@ def pbn_cli(
     effective_tile_spacing = tile_spacing
     effective_font_size = font_size
     effective_label_strategy = label_strategy
+    # effective_label_color = label_color # No, this is directly used.
 
     presets = {
         "beginner": {"num_colors": 6, "tile_spacing": 30, "font_size": 10, "label_strategy": "diagonal"},
@@ -245,6 +254,8 @@ def pbn_cli(
 
     typer.echo(f"Final PBN palette will aim for {effective_pbn_num_colors} colors.")
     typer.echo(f"Target font size for labels: {effective_font_size}.")
+    if not raster_only: # Only print if SVG is being generated
+        typer.echo(f"Target SVG label color: {label_color}") # <-- ADDED: Echo the color being used
     if enable_stable_font_scaling_cli:
         typer.echo("Iterative font scaling for 'stable' labels is ENABLED.")
     else:
@@ -438,19 +449,42 @@ def pbn_cli(
         primitives = segment.blobbify_primitives(primitives, img_data_for_segmentation_shape, area_min_px, area_max_px, min_label_font, interpolate_contours)
         typer.echo(f"After blobbification: {len(primitives)} regions processed.")
 
+    typer.echo(f"Target SVG label color: {label_color}")
+    typer.echo(f"Target outline color: {outline_color_cli}") 
+
+    # vector output
     font_path_for_vector_str = str(font_path) if font_path else None # For vector_output.write_svg
     if not raster_only and vector_path:
-        try: 
-            vector_output.write_svg(str(vector_path), canvas_size_for_final_output, primitives, 
-                                    font_path_str=font_path_for_vector_str, 
-                                    default_font_size=effective_font_size)
+        try:
+            vector_output.write_svg(
+                str(vector_path),
+                canvas_size_for_final_output,
+                primitives,
+                font_path_str=font_path_for_vector_str,
+                default_font_size=effective_font_size,
+                label_color_str=label_color,
+                outline_color_hex=outline_color_cli  # <-- PASS OUTLINE COLOR
+            )
             typer.echo(f"SVG output saved to: {vector_path}")
-        except Exception as e: typer.secho(f"Error writing SVG output: {e}", fg=typer.colors.RED); traceback.print_exc()
-    
+        except Exception as e:
+            typer.secho(f"Error writing SVG output: {e}", fg=typer.colors.RED); traceback.print_exc()    
+
+    # raster output
     try:
-        labeled_img = segment.render_raster_from_primitives(canvas_size_for_final_output, primitives, font_path) # Pass Path object
-        labeled_img.save(labeled_path); typer.echo(f"Labeled raster PNG output saved to: {labeled_path}")
-    except Exception as e: typer.secho(f"Error rendering raster output: {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
+        labeled_img = segment.render_raster_from_primitives(
+            canvas_size_for_final_output,
+            primitives,
+            font_path,
+            additional_nudge_pixels_up=render_nudge_pixels_up, # Defined earlier in your pbngen.py
+            label_text_color=label_color,
+            outline_color_str_hex=outline_color_cli  # <-- PASS OUTLINE COLOR
+        )
+        labeled_img.save(labeled_path)
+        typer.echo(f"Labeled raster PNG output saved to: {labeled_path}")
+    except Exception as e:
+        typer.secho(f"Error rendering raster output: {e}", fg=typer.colors.RED)
+        traceback.print_exc()
+        raise typer.Exit(code=1)
 
     if not skip_legend:
         try: 
