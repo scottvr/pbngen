@@ -3,7 +3,6 @@ from skimage.measure import label as sklabel
 from PIL import Image, ImageDraw, ImageFont, ImageColor
 import numpy as np # keep np for type hints
 import os
-# import typer # Removed, was not used for its primary CLI purpose here
 import random
 from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
