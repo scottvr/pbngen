@@ -1,0 +1,2 @@
+pbngen:CommandLineInvocation: The command used to generate the file.
+pbngen:PBNgen-FileType: The type or purpose of the PBNgen-generated file.

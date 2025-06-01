@@ -1,19 +1,20 @@
 import typer
-from pbn import quantize, segment, legend, stylize, palette_tools, vector_output, file_utils # Assuming pbn.segment exists
+from pbn import quantize, segment, legend, stylize, palette_tools, file_utils
 import os
 from pathlib import Path
 import numpy as np # Should be fine, as xp is aliased later
 from PIL import Image, UnidentifiedImageError, ImageOps
 import re
-from typing import Optional, List, Tuple # Added List, Tuple
+from typing import Optional, List, Tuple
 import traceback
+import sys # Added for sys.argv
 
 import rich.traceback
 try:
     import cupy as xp
     if xp.cuda.is_available():
         print("CuPy found, using GPU in pbngen.py.")
-        GPU_ENABLED = True # Ensure this is defined for pbngen.py context if needed elsewhere
+        GPU_ENABLED = True
     else:
         raise ImportError("CuPy found but CUDA not available")
 except ImportError:
@@ -36,8 +37,8 @@ class PBNFile(Enum):
 def quantize_pil_image(image_pil: Image.Image, num_quant_colors: int, method=Image.Quantize.MEDIANCUT) -> Image.Image:
     if image_pil.mode not in ('P', 'L'):
         image_pil = image_pil.convert('RGB')
-    if image_pil.mode == 'P': # If it was already palettized but not RGB
-        image_pil = image_pil.convert('RGB') # Convert to RGB before quantizing to ensure consistency
+    if image_pil.mode == 'P':
+        image_pil = image_pil.convert('RGB')
     return image_pil.quantize(colors=num_quant_colors, method=method)
 
 
@@ -211,6 +212,8 @@ def pbn_cli(
     """
     Generates a paint-by-number set from an input image.
     """
+    command_line_str = " ".join(sys.argv) # Capture command line invocation
+
     try:
         os.makedirs(output_dir, exist_ok=True)
         typer.echo(f"Using output directory: {output_dir}")
@@ -221,7 +224,7 @@ def pbn_cli(
     if not raster_only: expected_outputs.append("vector_output")
     output_paths = validate_output_dir(output_dir, overwrite=yes, expect=expected_outputs)
 
-    filtered_path = output_paths["filtered_input"] # This will store the *final* output of the filter chain
+    filtered_path = output_paths["filtered_input"]
     bpp_quantized_input_path = output_paths["bpp_quantized_input"]
     bpp_quantized_palette_path = output_paths["bpp_quantized_palette_input"]
     canvas_scaled_input_path = output_paths["canvas_scaled_input"]
@@ -272,12 +275,11 @@ def pbn_cli(
             effective_dpi_val = 96; typer.echo(f"Could not read DPI from image ({e}), defaulting to {effective_dpi_val} DPI.")
     else: typer.echo(f"Using user-provided DPI: {effective_dpi_val}")
 
-    # --- MODIFIED: Filter application logic for chaining ---
     current_input_image_path_for_processing: Path = input_path
     processed_through_filter_chain = False
     intermediate_filter_files_to_clean: List[Path] = []
 
-    if filter and len(filter) > 0 : # filter is now List[str]
+    if filter and len(filter) > 0 :
         typer.echo(f"Starting filter chain with {len(filter)} filter(s)...")
         temp_input_for_current_filter_step = current_input_image_path_for_processing
         
@@ -285,10 +287,8 @@ def pbn_cli(
             is_last_filter = (i == len(filter) - 1)
             
             if is_last_filter:
-                # The final output of the chain goes to the standard 'filtered_path'
                 output_for_this_filter_step = filtered_path 
             else:
-                # Intermediate outputs get unique names and will be PNGs
                 output_for_this_filter_step = (output_dir / f"_intermediate_filter_step_{i}").with_suffix(".png")
                 intermediate_filter_files_to_clean.append(output_for_this_filter_step)
 
@@ -296,8 +296,11 @@ def pbn_cli(
             typer.echo(f"    Input: {temp_input_for_current_filter_step.name}")
             typer.echo(f"    Output: {output_for_this_filter_step.name}")
             try:
+                # NOTE: stylize.apply_filter handles its own file saving.
+                # To save metadata here, stylize.apply_filter would need to be modified
+                # to either return a PIL image or internally use file_utils.save_pbn_png.
                 stylize.apply_filter(
-                    str(temp_input_for_current_filter_step), # stylize.py expects string paths
+                    str(temp_input_for_current_filter_step), 
                     str(output_for_this_filter_step), 
                     filter_name, 
                     blur_radius=blur_radius, 
@@ -312,16 +315,14 @@ def pbn_cli(
                 )
                 temp_input_for_current_filter_step = output_for_this_filter_step
                 processed_through_filter_chain = True 
-                # typer.echo(f"  Intermediate filtered image saved to: {output_for_this_filter_step}") # Path is already printed
             except ValueError as e: 
                 typer.secho(f"Styling error with filter '{filter_name}': {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
             except Exception as e: 
                 typer.secho(f"Unexpected error applying filter '{filter_name}': {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
         
         if processed_through_filter_chain:
-            current_input_image_path_for_processing = temp_input_for_current_filter_step # This will be the final filtered output path
+            current_input_image_path_for_processing = temp_input_for_current_filter_step
             typer.echo(f"Filter chain complete. Final styled image for next steps: {current_input_image_path_for_processing.name}")
-    # --- End of MODIFIED filter application logic ---
 
     path_to_main_image_for_canvas_scaling: Path = current_input_image_path_for_processing
     path_to_palette_image_for_extraction: Optional[Path] = palette_from
@@ -330,9 +331,20 @@ def pbn_cli(
         num_bpp_quant_colors = 2**bpp
         typer.echo(f"Applying --bpp {bpp} pre-quantization ({num_bpp_quant_colors} colors)...")
         try:
-            with Image.open(current_input_image_path_for_processing) as img_pil: # This is after filtering if any
+            with Image.open(current_input_image_path_for_processing) as img_pil:
                 pre_quant_input_pil = quantize_pil_image(img_pil, num_bpp_quant_colors)
-                pre_quant_input_pil.save(bpp_quantized_input_path)
+                # MODIFIED: Use file_utils.save_pbn_png
+                file_utils.save_pbn_png(
+                    pre_quant_input_pil,
+                    bpp_quantized_input_path,
+                    command_line_invocation=command_line_str,
+                    additional_metadata={
+                        "PBNgen-FileType": "BPP Pre-quantized Input",
+                        "SourceImage": str(current_input_image_path_for_processing),
+                        "BPP": str(bpp),
+                        "QuantColors": str(num_bpp_quant_colors)
+                    }
+                )
             path_to_main_image_for_canvas_scaling = bpp_quantized_input_path
             typer.echo(f"Pre-quantized input image saved to: {bpp_quantized_input_path}")
         except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
@@ -342,7 +354,18 @@ def pbn_cli(
             try:
                 with Image.open(palette_from) as palette_img_pil:
                     pre_quant_palette_pil = quantize_pil_image(palette_img_pil, num_bpp_quant_colors)
-                    pre_quant_palette_pil.save(bpp_quantized_palette_path)
+                    # MODIFIED: Use file_utils.save_pbn_png
+                    file_utils.save_pbn_png(
+                        pre_quant_palette_pil,
+                        bpp_quantized_palette_path,
+                        command_line_invocation=command_line_str,
+                        additional_metadata={
+                            "PBNgen-FileType": "BPP Pre-quantized Palette Source",
+                            "SourcePaletteImage": str(palette_from),
+                            "BPP": str(bpp),
+                            "QuantColors": str(num_bpp_quant_colors)
+                        }
+                    )
                 path_to_palette_image_for_extraction = bpp_quantized_palette_path
                 typer.echo(f"Pre-quantized palette source saved to: {bpp_quantized_palette_path}")
             except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
@@ -360,7 +383,7 @@ def pbn_cli(
         target_canvas_width_px, target_canvas_height_px = parsed_target_dims_px
         output_canvas_dimensions_px = (target_canvas_width_px, target_canvas_height_px)
         try:
-            with Image.open(path_to_main_image_for_canvas_scaling) as img_to_scale_on_canvas: # This is after filtering and/or bpp
+            with Image.open(path_to_main_image_for_canvas_scaling) as img_to_scale_on_canvas:
                 img_to_scale_on_canvas_rgba = img_to_scale_on_canvas.convert("RGBA")
                 source_w, source_h = img_to_scale_on_canvas_rgba.size
                 if source_w == 0 or source_h == 0: typer.secho(f"Error: Source image {path_to_main_image_for_canvas_scaling} has zero dimension.", fg=typer.colors.RED); raise typer.Exit(code=1)
@@ -381,7 +404,19 @@ def pbn_cli(
                 paste_x = (target_canvas_width_px - scaled_w) // 2
                 paste_y = (target_canvas_height_px - scaled_h) // 2
                 final_output_pil_canvas.paste(resized_content_img, (paste_x, paste_y), mask=resized_content_img if resized_content_img.mode == 'RGBA' else None)
-                final_output_pil_canvas.save(canvas_scaled_input_path)
+                
+                # MODIFIED: Use file_utils.save_pbn_png
+                file_utils.save_pbn_png(
+                    final_output_pil_canvas,
+                    canvas_scaled_input_path,
+                    command_line_invocation=command_line_str,
+                    additional_metadata={
+                        "PBNgen-FileType": "Canvas Scaled Input",
+                        "SourceImage": str(path_to_main_image_for_canvas_scaling),
+                        "TargetCanvasSize": f"{target_canvas_width_px}x{target_canvas_height_px}px",
+                        "EffectiveDPI": str(dpi_for_canvas)
+                    }
+                )
             path_to_main_image_for_pbn_quantization = canvas_scaled_input_path
             typer.echo(f"Image placed on {target_canvas_width_px}x{target_canvas_height_px}px canvas, saved to: {canvas_scaled_input_path}")
         except (FileNotFoundError, UnidentifiedImageError, Exception) as e:
@@ -395,6 +430,8 @@ def pbn_cli(
         except Exception as e: typer.secho(f"Error extracting PBN palette from {path_to_palette_image_for_extraction}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
     
     try:
+        # NOTE: quantize.quantize_image handles its own file saving.
+        # To save metadata here, quantize.quantize_image would need to be modified.
         final_pbn_palette = quantize.quantize_image(str(path_to_main_image_for_pbn_quantization), str(quantized_pbn_path), 
                                                     num_colors=effective_pbn_num_colors, 
                                                     fixed_palette=fixed_pbn_palette_data, 
@@ -433,10 +470,10 @@ def pbn_cli(
     effective_min_scaling_font_size = max(1, effective_min_scaling_font_size)
 
     segment_call_kwargs = {
-        "input_path": str(quantized_pbn_path), # segment.py likely expects str
+        "input_path": str(quantized_pbn_path),
         "palette": final_pbn_palette,
         "font_size": effective_font_size,
-        "font_path": str(font_path) if font_path else None, # Pass str Path object
+        "font_path": str(font_path) if font_path else None,
         "tile_spacing": effective_tile_spacing,
         "label_strategy": effective_label_strategy,
         "small_region_label_strategy": small_region_label_strategy,
@@ -477,7 +514,7 @@ def pbn_cli(
     font_path_for_vector_str = str(font_path) if font_path else None
     if not raster_only and vector_path:
         try:
-            vector_output.write_svg(
+            file_utils.save_pbn_svg(
                 str(vector_path),
                 canvas_size_for_final_output,
                 primitives,
@@ -494,12 +531,25 @@ def pbn_cli(
         labeled_img = segment.render_raster_from_primitives( # type: ignore
             canvas_size_for_final_output,
             primitives,
-            font_path, # render_raster_from_primitives might take Path object or str
+            font_path, 
             additional_nudge_pixels_up=render_nudge_pixels_up,
             label_text_color=label_color,
             outline_color_str_hex=outline_color_cli
         )
-        labeled_img.save(labeled_path)
+        # MODIFIED: Use file_utils.save_pbn_png
+        file_utils.save_pbn_png(
+            labeled_img,
+            labeled_path,
+            command_line_invocation=command_line_str,
+            additional_metadata={
+                "PBNgen-FileType": "Labeled Raster PBN Output",
+                "SourceQuantizedGuide": str(quantized_pbn_path),
+                "PaletteColors": str(len(final_pbn_palette)),
+                "LabelStrategy": effective_label_strategy or "default",
+                "SmallRegionStrategy": small_region_label_strategy,
+                "FontSize": str(effective_font_size)
+            }
+        )
         typer.echo(f"Labeled raster PNG output saved to: {labeled_path}")
     except Exception as e:
         typer.secho(f"Error rendering raster output: {e}", fg=typer.colors.RED)
@@ -508,6 +558,8 @@ def pbn_cli(
 
     if not skip_legend:
         try: 
+            # NOTE: legend.generate_legend handles its own file saving.
+            # To save metadata here, legend.generate_legend would need to be modified.
             legend.generate_legend(final_pbn_palette, str(legend_path), str(font_path) if font_path else None, # type: ignore
                                    effective_font_size, swatch_size, 10)
             typer.echo(f"Palette legend saved to: {legend_path}")
@@ -515,43 +567,29 @@ def pbn_cli(
     
     typer.secho("\nProcessing complete!", fg=typer.colors.GREEN)
 
-    # --- MODIFIED: No Cruft Logic ---
     if no_cruft:
         typer.echo("\n--no-cruft active: Cleaning up intermediate files...")
         
         files_to_delete_by_no_cruft: List[Path] = []
-        
-        # Add intermediate files from the filter chain explicitly
         files_to_delete_by_no_cruft.extend(intermediate_filter_files_to_clean)
-
-        # Add other standard intermediate files if they were created AND are not the
-        # direct input to the PBN quantization step.
-        # path_to_main_image_for_pbn_quantization is the image that is actually quantized.
         
-        # If filtered_path was created (i.e., filters were applied) AND
-        # it's not the final image used for PBN quantization (e.g., it was further processed by BPP or canvas scaling),
-        # then it's cruft.
         if processed_through_filter_chain and filtered_path.exists() and filtered_path != path_to_main_image_for_pbn_quantization:
             files_to_delete_by_no_cruft.append(filtered_path)
 
-        # If bpp_quantized_input_path was created AND it's not the final image for PBN quantization
         if bpp is not None and bpp_quantized_input_path.exists() and bpp_quantized_input_path != path_to_main_image_for_pbn_quantization:
             files_to_delete_by_no_cruft.append(bpp_quantized_input_path)
         
-        # bpp_quantized_palette_path is always cruft if it was created
         if bpp is not None and palette_from and bpp_quantized_palette_path.exists():
             files_to_delete_by_no_cruft.append(bpp_quantized_palette_path)
 
-        # If canvas_scaled_input_path was created AND it's not the final image for PBN quantization
-        # (This is rare, as canvas_scaled_input_path usually *is* path_to_main_image_for_pbn_quantization if this step ran)
         if canvas_size_str and canvas_scaled_input_path.exists() and canvas_scaled_input_path != path_to_main_image_for_pbn_quantization:
             files_to_delete_by_no_cruft.append(canvas_scaled_input_path)
         
         deleted_any_cruft = False
-        unique_files_to_delete = set(files_to_delete_by_no_cruft) # Avoid trying to delete same path twice
+        unique_files_to_delete = set(files_to_delete_by_no_cruft) 
 
         for file_path_to_delete in unique_files_to_delete:
-            if file_path_to_delete and file_path_to_delete.exists(): # Check existence again just in case
+            if file_path_to_delete and file_path_to_delete.exists():
                 try:
                     file_path_to_delete.unlink()
                     typer.echo(f"  Deleted: {file_path_to_delete.name}")
@@ -560,9 +598,8 @@ def pbn_cli(
                     typer.secho(f"  Error deleting {file_path_to_delete.name}: {e}", fg=typer.colors.RED)
         
         if not deleted_any_cruft:
-            # Check if there were any files initially identified for deletion but perhaps didn't exist
-            initial_cruft_existed = any(p.exists() for p in unique_files_to_delete if p) # Ensure p is not None
-            if not initial_cruft_existed and not any(intermediate_filter_files_to_clean): # if intermediate_filter_files_to_clean was empty too
+            initial_cruft_existed = any(p.exists() for p in unique_files_to_delete if p) 
+            if not initial_cruft_existed and not any(intermediate_filter_files_to_clean):
                  typer.echo("  No intermediate byproduct files were found or identified for deletion.")
 
     if output_dir: typer.echo(f"Outputs in: {output_dir.resolve()}")
