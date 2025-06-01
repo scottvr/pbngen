@@ -184,7 +184,7 @@ def pbn_cli(
         help="Enable iterative font scaling for 'stable' label placement strategy."
     ),
     label_color: Optional[str] = typer.Option(
-        "#000000", "--label-color", help="Color for text labels in SVG and raster (e.g., '#FF0000' or 'red'). Default: '#000000' (black)."
+        "#88ddff", "--label-color", help="Color for text labels in SVG and raster (e.g., '#FF0000' or 'red'). Default: '#88ddff' (black)."
     ),
     outline_color_cli: str = typer.Option(
         "#88ddff",
