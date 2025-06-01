@@ -100,6 +100,8 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 - Please read the documentation to the end and try a few settings before opening an Issue
 - If it really seems that pbngen can't make a good pbn canvas image for you, please *DO* open an Issue; attach the image you are trying to process along with the command-lines you've tried.
 
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
+
 -----
 
 ## Options
