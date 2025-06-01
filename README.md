@@ -190,7 +190,7 @@ To chain filters, simply specify the --filter option multiple times on the comma
 If you want to first apply a blur filter to soften your image and then apply a painterly-med filter for an artistic touch, you would use the following command:
 
 ``` bash
-
+python pbngen.py your_image.jpg ./pbn_output --filter blur --filter painterly-med
 ```
 In this command:
 
