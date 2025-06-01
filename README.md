@@ -8,7 +8,7 @@ The **LeadEngine** (aka [Pb](https://wikipedia.com/wiki/lead)Ngen, that's "lead"
 - Two-stage color quantization:
     - Optional initial global color reduction using Bits Per Pixel (`--bpp`).
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
-- Filter preprocessing: `blur`, `pixelate`, `mosaic`, painterly and smoothing filters
+- Filter preprocessing: `blur`, `pixelate`, `mosaic`, painterly and smoothing filters.
 - Complexity presets for beginner to master-level detail.
 - Label placement strategies: `diagonal`, `centroid`, `stable`.
 - Custom font support for overlays and legend.
@@ -44,7 +44,7 @@ python pbngen.py my_photo.jpg ./pbn_output
 ```
 This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate preset).
 
-[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki) 
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
 
 See [Tips for Best Results](#tips-for-best-results) further down in this README.
 
@@ -58,7 +58,7 @@ python pbngen.py "Vacation Pic.png" "./Vacation PBN" \
   --preset master \
   --palette-from "artist_palette.png" \
   --font-path "./fonts/Arial.ttf" \
-  --label_strategy stable \
+  --label-strategy stable \
   --blobbify \
   --blob-min 5 \
   --dpi 300 \
@@ -104,71 +104,92 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 ## Options
 
-| Flag                          | Description                                                                                                                               | Default        |
-|-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------------|
-| `INPUT_FILE`                  | (Positional) Path to the input image file.                                                                                                | **Required** |
-| `OUTPUT_DIRECTORY`            | (Positional) Path to the directory where output files will be saved.                                                                      | **Required** |
-| `--preset TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
-| `--filter TEXT`                | Preprocessing filter to apply to the input image: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`, `smooth`, `smooth_more`                                                     | `None`   | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
-| `--small-region-strategy` | This allows the selection of which labeling strategy (`centroid`, `stable`, `diagonal`) should be tried when attempting to place a label in a region that is shorter or narrower than the `tile-spacing` setting. | stable |
-| `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
-| `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
-| `--palette-from FILE_PATH`    | Path to an image to extract a fixed palette from for the final PBN colors. This image is also subject to `--bpp` pre-quantization.        | `None`         |
-| `--no-frequency-sort-palette`    | Do not sort the PBN palette by frequency | Default is to sort palette     |
-| `--font-path FILE_PATH`       | Path to a `.ttf` font file for labels and legend.                                                                                         | System default |
-| `--font-size INTEGER`         | Base font size for overlay labels and legend text.                                                                                        | 12             |
-| `--label_strategy TEXT`           | Label placement strategy: `diagonal`, `centroid`, `stable`.                                                                               | `diagonal`     |
-| `--tile-spacing INTEGER`      | Approximate distance (pixels) between repeated number labels in a large region.                                                           | 30             |
-| `--swatch-size INTEGER`       | Width/height (pixels) of each color swatch in the legend.                                                                                 | 40             |
-| `--skip-legend` | If set, skips generating the palette legend image.                                                                               | `False`        |
-| `--raster-only` | Only generate raster output (labeled PNG); skip vector SVG output.                                                                 | `False`        |
-| `--yes` / `-y`                | Automatically overwrite existing output files without prompting.                                                                          | `False`        |
-| `--blobbify` | Enable painterly splitting of color regions into smaller, more organic 'blobs'.                                                          | `False`        |
-| `--blob-min INTEGER`          | Minimum blob area in mm² (used if `--blobbify` is active).                                                                                | 3              |
-| `--blob-max INTEGER`          | Maximum blob area in mm² (used if `--blobbify` is active).                                                                                | 30             |
-| `--min-label-font INTEGER`    | Minimum font size allowed for blob labeling if `--blobbify` is active.                                                                    | 8              |
-| `--no-interpolate-contours` |  Do not interpolate contour lines for smoother appearance. Disable for simpler SVGs.                                    | `True`         |
-| `--dpi INTEGER`               | Dots Per Inch (DPI) for mm² to pixel conversion (used with `--blobbify`). Overrides DPI from image metadata if provided.                | Auto or 96     |
-| `-h`, `--help`                | Show the help message and exit.                                                                                                           |                |
-
-
+| Flag                                   | Description                                                                                                                                                             | Default (from code)      |
+|----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| **Positional Arguments** |                                                                                                                                                                         |                          |
+| `INPUT_FILE`                           | (Positional) Path to the input image file.                                                                                                                              | **Required** |
+| `OUTPUT_DIRECTORY`                     | (Positional) Path to the directory where output files will be saved.                                                                                                    | **Required** |
+| **General Output & Behavior** |                                                                                                                                                                         |                          |
+| `--preset TEXT`                        | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`, `label-strategy`. See "Complexity Presets". | `None`                   |
+| `--canvas-size TEXT`                   | Desired physical canvas size (e.g., '10x8in', '29.7x21cm'). See "Specifying Physical Canvas Size" section. Uses DPI from `--dpi`.                                       | `None`                   |
+| `--dpi INTEGER`                        | Target Dots Per Inch for `--canvas-size` and `--blobbify`. Overrides image metadata; if neither is set, defaults to 96 DPI.                                             | `None` (Auto or 96)      |
+| `--raster-only`                        | Skip vector SVG output, generating only raster (PNG) outputs.                                                                                                           | `False`                  |
+| `--yes` / `-y`                         | Automatically overwrite existing output files without prompting.                                                                                                        | `False`                  |
+| `--no-cruft`                           | Delete intermediate byproduct files (e.g., filtered input, BPP quantized images) upon completion.                                                                         | `False`                  |
+| **Color Quantization & Palette** |                                                                                                                                                                         |                          |
+| `--num-colors INTEGER`                 | Final number of colors for the PBN palette.                                                                                                                             | `None` (preset or 12)    |
+| `--bpp INTEGER`                        | Bits Per Pixel (1-8) for an *initial* color depth reduction. Applied before final PBN quantization.                                                                     | `None`                   |
+| `--palette-from FILE_PATH`             | Path to an image to extract a fixed palette from for the PBN. This image is also subject to `--bpp` pre-quantization.                                                     | `None`                   |
+| `--dither`                             | Enable dithering in the final PBN color quantization stage.                                                                                                             | `False`                  |
+| `--frequency-sort-palette` /<br>`--no-frequency-sort-palette` | Sort PBN palette by color frequency (most used first). Use `--no-frequency-sort-palette` to disable.                                                                | `True`                   |
+| **Image Pre-processing & Styling** |                                                                                                                                                                         |                          |
+| `--filter TEXT`                        | Preprocessing filter. Options: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`, `smooth`, `smooth_more`. See "Styling Options" table.       | `None`                   |
+| **Segmentation & Region Control** |                                                                                                                                                                         |                          |
+| `--min-region-area INTEGER`            | Minimum pixel area for a color region to be processed and labeled. Must be >= 1.                                                                                        | `None` (internal: 50)    |
+| `--interpolate-contours` /<br>`--no-interpolate-contours` | Smooth contour lines. Use `--no-interpolate-contours` for simpler SVGs.                                                                                             | `True`                   |
+| **Labeling Options** |                                                                                                                                                                         |                          |
+| `--font-path FILE_PATH`                | Path to a `.ttf` font file for labels and legend.                                                                                                                       | `None` (System default)  |
+| `--font-size INTEGER`                  | Base font size for labels. Must be >=1.                                                                                                                                 | `None` (preset or 10)    |
+| `--label-strategy TEXT`                | Label placement strategy: `diagonal` (or `quincunx`), `centroid`, `stable`.                                                                                             | `None` (preset or `diagonal`)|
+| `--small-region-strategy TEXT`         | Labeling strategy for small regions that cannot fit standard labels: `stable`, `centroid`, `none`.                                                                        | `stable`                 |
+| `--tile-spacing INTEGER`               | Approximate distance (pixels) between repeated labels for `diagonal` strategy. Must be >=1.                                                                             | `None` (preset or 20)    |
+| `--enable-stable-font-scaling`         | Enable iterative font scaling for `stable` label placement strategy to fit labels in smaller regions.                                                                     | `False`                  |
+| `--min-scaling-font-size INTEGER`      | Minimum font size (>=4) for labels when iterative scaling is applied with `stable` strategy and `--enable-stable-font-scaling`.                                           | `None` (internal: 6)     |
+| `--label-color TEXT`                   | Color for text labels in SVG and raster (e.g., '#FF0000', 'red').                                                                                                       | `"#000000"` (black)      |
+| `--outline-color TEXT`                 | Color for PBN outlines in SVG and raster (e.g., '#88ddff', 'lightblue').                                                                                                 | `"#88ddff"`              |
+| **Legend Options** |                                                                                                                                                                         |                          |
+| `--skip-legend`                        | Skip generating the palette legend image.                                                                                                                               | `False`                  |
+| `--swatch-size INTEGER`                | Width/height (pixels) of each color swatch in the legend (min 10).                                                                                                      | `40`                     |
+| **Blobbify (Painterly Effect)** |                                                                                                                                                                         |                          |
+| `--blobbify` / `--blobify`             | Split regions into smaller 'blobs' for a painterly effect.                                                                                                              | `False`                  |
+| `--blob-min INTEGER`                   | Minimum blob area in mm² (used if `--blobbify` is active, min 1).                                                                                                       | `3`                      |
+| `--blob-max INTEGER`                   | Maximum blob area in mm² (used if `--blobbify` is active, min 1).                                                                                                       | `30`                     |
+| `--min-label-font INTEGER`             | Fixed font size for blob labels (not scaled, min 1). Used if `--blobbify` is active.                                                                                    | `8`                      |
+| **Help** |                                                                                                                                                                         |                          |
+| `-h`, `--help`                         | Show the help message and exit.                                                                                                                                         |                          |
 
 ### Complexity Presets
 
-| Name         | PBN Colors | Tile Spacing | Font Size |
-|--------------|------------|--------------|-----------|
-| `beginner`   | 6          | 40px         | 14        |
-| `intermediate`| 12         | 30px         | 12        |
-| `master`     | 24         | 20px         | 10        |
-*(These presets set defaults; explicit options like `--num-colors` will override them.)*
+Presets provide a quick way to set multiple options for different levels of detail. Explicit options will override preset values.
+
+| Name         | PBN Colors | Tile Spacing | Font Size | Label Strategy |
+|--------------|------------|--------------|-----------|----------------|
+| `beginner`   | 6          | 30px         | 10        | `diagonal`     |
+| `intermediate`| 12         | 20px         | 10        | `stable`       |
+| `master`     | 24         | 10px         | 12        | `stable`       |
+*(These presets set defaults for `num_colors`, `tile_spacing`, `font_size`, and `label_strategy` if those options are not explicitly provided. Values from pbngen.py)*
 
 ### Filter Options
 
-| Name       | Description                              |
-|------------|------------------------------------------|
-| `blur`     | Applies a Gaussian blur.                 |
-| `Smooth`     | Applies a bilateral blur. |
-| `smooth_more`     | Applies more bilateral blur.|
-| `pixelate` | Chunky low-resolution pixelation.        |
-| `mosaic`   | Pixelate and upscale for blended effect. |
-| `painterly` | Make the source image look more "painterly" before beginning the PBN conversion. |
-| `painterly-med`  | A slightly-better attempt at the above. Introduces the --brush-* options elsewhere described. |
-| `painterly-hi` | About on par with the previous, but responds to `fervor` rather than `focus` and behaves differently in the lack of --brush-* arguments |
+The `--filter TEXT` option allows you to apply a visual preprocessing effect to your input image.
+
+| Name           | Description                              |
+|----------------|------------------------------------------|
+| `blur`         | Applies a Gaussian blur.                 |
+| `smooth`       | Applies a bilateral blur.                |
+| `smooth_more`  | Applies more bilateral blur.             |
+| `pixelate`     | Chunky low-resolution pixelation.        |
+| `mosaic`       | Pixelate and upscale for blended effect. |
+| `painterly-lo` | Basic painterly effect.                  |
+| `painterly-med`| Intermediate painterly effect.           |
+| `painterly-hi` | Advanced painterly effect.               |
+*(Filter options from pbngen.py help text)*
 
 ### Styling Options and Parameters
 
-The `--filter TEXT` option allows you to apply a visual preprocessing effect to your input image. The available filters are `blur`, `pixelate`, and `mosaic`. You can further control the intensity or characteristics of these filters using the following parameters:
+You can further control the intensity or characteristics of filters using the following parameters. These are only active if a relevant `--filter` is selected.
 
-| Style Selected      | Parameter Flag              | Description                                                                                                        | Default Behavior (if flag not used)                                    |
-|---------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| `--filter blur`      | `--blur-radius INTEGER`     | Sets the radius for the Gaussian blur effect. Higher values increase blurriness. Must be a positive integer.        | `4` (as defined in the `stylize` module)                             |
-| `--filter pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
-| `--filter mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
-| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly filters that make multiple passes                                       | 1 - 3    |
-| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
-| `--brush-step INTEGER`        | how many units (px) to step down between brush changes, where applicable.                     | Calculated based on `num-brushes` and `brush-size`.   |
-| `--focus INTEGER`             | How "tidy" the pre-pbn filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
-| `--fervor INTEGER`            | How "manic" the pre-pbning filter brush strokes are. Higher is more intense and takes longer.   |   1       |
+| Parameter Flag                | Applies to Filter(s)                               | Description                                                                                                        | Default Behavior (if flag not used)                                    |
+|-------------------------------|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| `--edge-strength FLOAT`       | (Painterly/detail enhancing filters)               | Strength of Edge Enhancement (0.0-1.0).                                                                             | `None` (internal: 0.5 if filter active)                          |
+| `--blur-radius INTEGER`       | `blur`                                             | Sets the radius for the Gaussian blur. Higher values increase blurriness. Must be >= 1.                     | `None` (internal: 4)                                         |
+| `--pixelate-block-size INTEGER`| `pixelate`                                         | Sets the size (pixels) of blocks for pixelation. Must be >= 1.                                           | `None` (dynamic: `max(4, min(img_w, img_h) // 64)`)        |
+| `--mosaic-block-size INTEGER` | `mosaic`                                           | Sets the size (pixels) of blocks for mosaic effect. Must be >= 1.                                          | `None` (dynamic: `max(4, min(img_w, img_h) // 64)`)        |
+| `--num-brushes INTEGER`       | `painterly-med`, `painterly-hi` (iterative ones)   | Number of brush passes (decreasing size) for some painterly filters. Must be >= 1.                         | `None` (internal: varies, e.g., 1-3)                         |
+| `--brush-size INTEGER`        | `painterly-med`, `painterly-hi`                    | Base brush diameter (pixels) for first pass of some painterly filters. Must be >= 1.                       | `None` (internal: dynamic based on image size)               |
+| `--brush-step INTEGER`        | `painterly-med`, `painterly-hi`                    | Brush size decrement (pixels) for iterative painterly filters. Must be >= 1.                               | `None` (internal: dynamic based on num-brushes/brush-size) |
+| `--focus INTEGER`             | `painterly-med` (or similar)                       | How "tidy" brush strokes are for some painterly filters. Lower is more painterly. Must be >= 1.        | `None` (internal: 1)                                         |
+| `--fervor INTEGER`            | `painterly-hi` (or similar)                        | How "manic" brush strokes are for some painterly filters. Higher is more intense. Must be >= 1.        | `None` (internal: 1)                                         |
 
 -----
 
@@ -180,17 +201,17 @@ First, select a filter with `--filter <filter_name>`, then optionally add its co
     ```bash
     python pbngen.py input.jpg ./output --filter blur --blur-radius 7
     ```
-
+   
 * To apply pixelation with a block size of 10 pixels:
     ```bash
     python pbngen.py input.jpg ./output --filter pixelate --pixelate-block-size 10
     ```
-
+   
 * To apply the mosaic effect with its default (dynamically calculated) block size:
     ```bash
     python pbngen.py input.jpg ./output --filter mosaic
     ```
-
+   
 If you specify a filter parameter flag (e.g., `--blur-radius`) without the corresponding `--filter` flag (e.g., `--filter blur`), the parameter flag will be ignored as no filter is being applied. The parameter flags are only active when their associated filter is selected.
 
 ------
@@ -226,11 +247,12 @@ python pbngen.py my_image.jpg ./output_12x16 \
   --dpi 300 \
   --num-colors 2
 ```
+
 -----
 
 ### Label Modes (Placement Strategies)
 
--   `diagonal` (default): Fast, places labels on a diagonal grid within regions. Can sometimes be dense.
+-   `diagonal` (default, or set by preset): Fast, places labels on a diagonal grid within regions. Can sometimes be dense.
 -   `centroid`: Places a single label at the geometric center of each region. Best for simple, convex shapes.
 -   `stable`: Finds the most "stable" point within each region (deepest inside the color). Often gives good placement but is significantly slower.
 
@@ -300,7 +322,7 @@ graph TD
     end
 ```
 
-As you can see, the vector representation (of segmented primitives) is the source for the raster image, so eliding SVG output it won't save any noticeable time. 
+As you can see, the vector representation (of segmented primitives) is the source for the raster image, so eliding SVG output it won't save any noticeable time.
 
 -----
 
@@ -321,9 +343,9 @@ Blobs that are too small to legibly fit a label (based on `--min-label-font`) ar
 | Flag                | Description                                                                 | Default |
 |---------------------|-----------------------------------------------------------------------------|---------|
 | `--blobbify`        | Enable painterly splitting of color regions.                                | `False` |
-| `--blob-min`        | Minimum blob area in mm² (converted to pixels using DPI).                   | 3       |
-| `--blob-max`        | Maximum blob area in mm² (converted to pixels using DPI).                   | 30      |
-| `--min-label-font`  | Minimum font size (points) required for a blob to receive its own label.    | 8       |
+| `--blob-min`        | Minimum blob area in mm² (converted to pixels using DPI).                   | `3`     |
+| `--blob-max`        | Maximum blob area in mm² (converted to pixels using DPI).                   | `30`    |
+| `--min-label-font`  | Minimum font size (points) required for a blob to receive its own label.    | `8`     |
 | `--dpi`             | DPI used for mm² to pixel conversion for blob sizing. Uses image metadata or defaults to 96 if not set. | Auto/96 |
 
 ### Blobbify Example
@@ -345,7 +367,7 @@ This generates a PBN for `landscape.png` with 20 final colors, where regions are
 
 ## Hardware Support (GPU Acceleration)
 
-Some operations are computationally-expensive enough that for a large and complex source image, no amount of CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs. 
+Some operations are computationally-expensive enough that for a large and complex source image, no amount of CPU is going to be performant enough to complete in a "while-you-wait" timeframe. In the interest of more-immediate gratification, repetitive calculations have been parallelized with support for running on NVIDIA CUDA-capable GPUs.
 
 If installed, PbNgen will automagically use CuPy in place of NumPy and SciPy for many operations, provided it can detect a working CUDA environment. It has been tested with CUDA 12.9.
 
@@ -355,7 +377,7 @@ This link is to instructions that will help you get it set up if you need it: [O
 
 PbNgen will attempt to use the GPU if all prerequisites are met and CuPy is functioning, otherwise it will fallback to CPU.  A message will be printed to stdout on startup whether it will use CPU or GPU.
 
-Further, some of SciKit Learn's (sk-learn) functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked here. 
+Further, some of SciKit Learn's (sk-learn) functionality can be accelerated by initializing [NVIDIA RAPIDS CuML](https://docs.rapids.ai/install/#wsl2) as per the docs linked here.
 
 To get scikit-learn to use these accelerated functions you must wrap your pbngen invocation with cuml like so: 
 
