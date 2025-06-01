@@ -556,14 +556,39 @@ def pbn_cli(
         traceback.print_exc()
         raise typer.Exit(code=1)
 
-    if not skip_legend:
-        try: 
-            # NOTE: legend.generate_legend handles its own file saving.
-            # To save metadata here, legend.generate_legend would need to be modified.
-            legend.generate_legend(final_pbn_palette, str(legend_path), str(font_path) if font_path else None, # type: ignore
-                                   effective_font_size, swatch_size, 10)
-            typer.echo(f"Palette legend saved to: {legend_path}")
-        except Exception as e: typer.secho(f"Error generating palette legend: {e}", fg=typer.colors.RED); traceback.print_exc()
+    if not skip_legend: #
+        try:
+            # Call the modified function from legend.py which now returns a PIL Image
+            # The last argument '10' was for padding, which is a named argument in create_legend_image
+            legend_pil_image = legend.create_legend_image(
+                final_pbn_palette,
+                font_path=str(font_path) if font_path else None, #
+                font_size=effective_font_size, #
+                swatch_size=swatch_size, #
+                padding=10 # This was the fixed value previously passed
+            )
+
+            if legend_pil_image:
+                additional_legend_metadata = {
+                    "PBNgen-FileType": "Palette Legend",
+                    "PaletteColors": str(len(final_pbn_palette)), #
+                    "SwatchSize": str(swatch_size), #
+                    "LegendFontSize": str(effective_font_size) #
+                    # You can add other relevant metadata here if needed
+                }
+                file_utils.save_pbn_png(
+                    legend_pil_image,
+                    legend_path, #
+                    command_line_invocation=command_line_str,
+                    additional_metadata=additional_legend_metadata
+                )
+                typer.echo(f"Palette legend saved to: {legend_path}") #
+            else:
+                typer.secho(f"Warning: Palette legend image could not be generated (e.g., empty palette).", fg=typer.colors.YELLOW)
+
+        except Exception as e:
+            typer.secho(f"Error generating or saving palette legend: {e}", fg=typer.colors.RED) #
+            traceback.print_exc() #    
     
     typer.secho("\nProcessing complete!", fg=typer.colors.GREEN)
 

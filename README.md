@@ -115,6 +115,31 @@ For each generated PNG and SVG file, PBNgen typically embeds:
 
 This embedded metadata ensures that crucial information about the provenance and generation parameters of your PBNgen assets is self-contained within the files themselves, promoting better organization and reproducibility.
 
+### Viewing Embedded Metadata with `extract_pbngen_meta.py`
+
+To complement the embedded metadata feature, this project includes a standalone Python script called `extract_pbngen_meta.py`. This utility provides a simple way to read and display the custom PBNgen-specific metadata from your generated PNG and SVG files directly from the command line.
+
+**Key Features of the Extractor:**
+
+* **Supports both PNG and SVG files:** The script automatically detects the file type and uses the appropriate method to parse and extract the metadata.
+* **Python-based:** It utilizes the Pillow (PIL) library for reading PNG metadata and Python's built-in `xml.etree.ElementTree` for SVG metadata. This means it works as a standalone Python tool without needing external applications like `exiftool` configured for these specific custom tags.
+* **PBNgen-Specific:** The script is tailored to find and display:
+    * In PNGs: Textual data chunks where the keyword is prefixed with `pbngen:` (e.g., `pbngen:command_line`).
+    * In SVGs: Custom XML elements within the `<metadata>` block that belong to the `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#` namespace (e.g., `CommandLineInvocation`, `PBNgen_FileType`).
+
+**How to Use:**
+
+Run the script from your terminal, providing the path to the PBNgen-generated file you wish to inspect:
+
+    ```bash
+    python extract_pbngen_meta.py your_output_file.png
+    ```
+    or
+    ```bash
+    python extract_pbngen_meta.py your_output_file.svg
+    ```
+
+The script will then print out all the PBNgen-specific key-value metadata pairs it discovers within the specified file, giving you a quick and easy way to verify or recall the generation parameters.
 -----
 
 ## Tips for Best Results

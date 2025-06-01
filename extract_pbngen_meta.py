@@ -1,0 +1,111 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+from PIL import Image
+import xml.etree.ElementTree as ET
+
+# Define the namespace URI used in your SVGs and the prefix for PNG metadata
+PBNGEN_SVG_NS_URI = 'http://www.github.com/scottvr/pbngen/assets/ns/pbngen#' #
+PNG_METADATA_PREFIX = "pbngen:" #
+
+def extract_png_metadata(filepath: Path):
+    """
+    Extracts and prints PBNgen metadata from a PNG file.
+    """
+    print(f"--- PBNgen Metadata for PNG: {filepath.name} ---")
+    try:
+        with Image.open(filepath) as img:
+            # Metadata is typically in img.info (which often includes .text items)
+            # The keys are exactly as written by save_pbn_png
+            found_metadata = False
+            if img.info:
+                for key, value in img.info.items():
+                    if key.startswith(PNG_METADATA_PREFIX):
+                        # Clean up the key for display (remove prefix)
+                        display_key = key[len(PNG_METADATA_PREFIX):]
+                        print(f"  {display_key}: {value}")
+                        found_metadata = True
+            
+            if not found_metadata:
+                print("  No PBNgen-specific metadata found.")
+
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+    except Exception as e:
+        print(f"Error processing PNG file {filepath}: {e}")
+    print("-" * (30 + len(filepath.name)))
+
+
+def extract_svg_metadata(filepath: Path):
+    """
+    Extracts and prints PBNgen metadata from an SVG file.
+    """
+    print(f"--- PBNgen Metadata for SVG: {filepath.name} ---")
+    try:
+        tree = ET.parse(filepath)
+        root = tree.getroot()
+        
+        # Find the <metadata> element.
+        # According to your file_utils.py, it has id="pbngenApplicationMetadata"
+        # However, ElementTree's find doesn't support attribute selection directly in older Pythons without lxml.
+        # We'll iterate or use a more general find.
+        
+        metadata_element = None
+        # Try to find by specific ID if possible, or generic 'metadata' tag
+        # XPath like './/metadata[@id="pbngenApplicationMetadata"]' would be ideal but needs lxml or careful handling.
+        # For simplicity, we find the first 'metadata' tag. If there are multiple, this might need refinement.
+        for elem in root.findall('.//{*}metadata'): # Search for 'metadata' in any namespace
+            if elem.get('id') == 'pbngenApplicationMetadata': #
+                metadata_element = elem
+                break
+        if metadata_element is None: # Fallback if ID not found or not unique
+            metadata_element = root.find('.//{*}metadata')
+
+
+        if metadata_element is not None:
+            found_metadata = False
+            for child in metadata_element:
+                # ElementTree stores namespaced tags as "{namespace_uri}local_name"
+                if child.tag.startswith(f'{{{PBNGEN_SVG_NS_URI}}}'):
+                    local_name = child.tag.split('}', 1)[1]
+                    print(f"  {local_name}: {child.text.strip() if child.text else ''}")
+                    found_metadata = True
+            
+            if not found_metadata:
+                print(f"  No PBNgen-specific metadata elements found within the <metadata> block of '{filepath.name}'.")
+        else:
+            print(f"  No <metadata> block found in '{filepath.name}'.")
+
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+    except ET.ParseError:
+        print(f"Error: Could not parse SVG file (invalid XML): {filepath}")
+    except Exception as e:
+        print(f"Error processing SVG file {filepath}: {e}")
+    print("-" * (30 + len(filepath.name)))
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python extract_pbngen_meta.py <filename.png_or_svg>")
+        sys.exit(1)
+
+    filepath_str = sys.argv[1]
+    filepath = Path(filepath_str)
+
+    if not filepath.is_file():
+        print(f"Error: File not found: {filepath}")
+        sys.exit(1)
+
+    file_extension = filepath.suffix.lower()
+
+    if file_extension == ".png":
+        extract_png_metadata(filepath)
+    elif file_extension == ".svg":
+        extract_svg_metadata(filepath)
+    else:
+        print(f"Error: Unsupported file type '{file_extension}'. Please provide a .png or .svg file.")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
