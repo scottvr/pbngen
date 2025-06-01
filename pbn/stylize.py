@@ -5,22 +5,22 @@ import os
 import typer # for typer.echo
 import math
 
-def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, brush_step=None, brush_size=None, edge_strength=None, num_brushes=None, fervor=None, focus=None):
+def apply_filter(input_path, output_path, filter, blur_radius=None, pixelate_block_size=None, mosaic_block_size=None, brush_step=None, brush_size=None, edge_strength=None, num_brushes=None, fervor=None, focus=None):
     """
-    Applies a specified visual style to an input image and saves the output.
+    Applies a specified visual filter to an input image and saves the output.
 
     Args:
         input_path (str): Path to the input image file.
-        output_path (str): Path to save the styled image.
-        style (str): The name of the style to apply (e.g., "blur", "pixelate", "mosaic", "impressionist").
-        blur_radius (int, optional): Radius for Gaussian blur, used by "blur" and "impressionist" styles.
-        pixelate_block_size (int, optional): Block size for "pixelate" style.
-        mosaic_block_size (int, optional): Block size for "mosaic" style.
+        output_path (str): Path to save the filtered image.
+        filter (str): The name of the filter to apply (e.g., "blur", "pixelate", "mosaic", "impressionist").
+        blur_radius (int, optional): Radius for Gaussian blur, used by "blur" and "impressionist" filters.
+        pixelate_block_size (int, optional): Block size for "pixelate" filter.
+        mosaic_block_size (int, optional): Block size for "mosaic" filter.
         brush_size:
         focus:
 
     Raises:
-        ValueError: If the input file is not found, cannot be opened, or if an unknown style is specified.
+        ValueError: If the input file is not found, cannot be opened, or if an unknown filter is specified.
     """
     try:
         image = Image.open(input_path)
@@ -30,55 +30,55 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
         # Catch other PIL-related errors during open
         raise ValueError(f"Error opening image {input_path}: {e}")
 
-    if style == "blur":
+    if filter == "blur":
         # Determine the actual blur radius to use.
         # If blur_radius is not provided by the caller, default to 4.
         actual_blur_radius = blur_radius if blur_radius is not None else 4
-        styled_image = image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
-        styled_image.save(output_path)
+        filtered_image = image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
+        filtered_image.save(output_path)
 
-    elif style == "smooth":
-        styled_image = image.filter(ImageFilter.SMOOTH)
-        styled_image.save(output_path)
+    elif filter == "smooth":
+        filtered_image = image.filter(ImageFilter.SMOOTH)
+        filtered_image.save(output_path)
         
-    elif style == "smooth_more":
-        styled_image = image.filter(ImageFilter.SMOOTH_MORE)
-        styled_image.save(output_path)
+    elif filter == "smooth_more":
+        filtered_image = image.filter(ImageFilter.SMOOTH_MORE)
+        filtered_image.save(output_path)
 
-    elif style == "pixelate":
+    elif filter == "pixelate":
         actual_block_size = pixelate_block_size if pixelate_block_size is not None else 10
         img_small = image.resize((image.width // actual_block_size, image.height // actual_block_size), Image.Resampling.BILINEAR)
-        styled_image = img_small.resize(image.size, Image.Resampling.NEAREST)
-        print(f"Stylize: 'pixelate' style with block_size {pixelate_block_size} (Not fully implemented in this example). Saving original.")
-        styled_image.save(output_path)
-#   elif style == "pixelate":
+        filtered_image = img_small.resize(image.size, Image.Resampling.NEAREST)
+        print(f"Stylize: 'pixelate' filter with block_size {pixelate_block_size} (Not fully implemented in this example). Saving original.")
+        filtered_image.save(output_path)
+#   elif filter == "pixelate":
 #        # Resize down and back up to simulate pixelation
 #        w, h = image.size
 #        if not pixelate_block_size: # user passed no argument
 #            pixelate_block_size = 64
 #        pixel_size = max(4, min(w, h) // pixelate_block_size)
-#        styled = image.resize((w // pixel_size, h // pixel_size), resample=Image.NEAREST)
-#        styled = styled.resize((w, h), resample=Image.NEAREST)
+#        filtered = image.resize((w // pixel_size, h // pixel_size), resample=Image.NEAREST)
+#        filtered = filtered.resize((w, h), resample=Image.NEAREST)
 
-    elif style == "mosaic":
-        print(f"Stylize: 'mosaic' style with block_size {mosaic_block_size} (Not fully implemented in this example). Saving original.")
+    elif filter == "mosaic":
+        print(f"Stylize: 'mosaic' filter with block_size {mosaic_block_size} (Not fully implemented in this example). Saving original.")
         # Similar to pixelate but with bicubic upscale for blocky blending
         w, h = image.size
         if not mosaic_block_size:
             mosaic_block_size = 64
         block_size = max(4, min(w, h) // mosaic_block_size)
-        styled_image = image.resize((w // block_size, h // block_size), resample=Image.NEAREST)
-        styled_image = styled.resize((w, h), resample=Image.BICUBIC)
-        styled_image.save(output_path)
+        filtered_image = image.resize((w // block_size, h // block_size), resample=Image.NEAREST)
+        filtered_image = filtered.resize((w, h), resample=Image.BICUBIC)
+        filtered_image.save(output_path)
 
-    elif style == "impressionist":
+    elif filter == "impressionist":
         w, h = image.size
         
         # Ensure the image is in RGB mode for consistent color handling
         image_rgb = image.convert("RGB")
 
         # Determine the blur radius for the source of brush colors.
-        # If blur_radius is not specified by the user for this style, use a default of 10.
+        # If blur_radius is not specified by the user for this filter, use a default of 10.
         actual_blur_radius = blur_radius
         if actual_blur_radius is None:
             actual_blur_radius = 10 
@@ -145,11 +145,11 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
                 # Draw the brush stroke
                 draw.ellipse([(x0, y0), (x1, y1)], fill=color)
                 
-        styled_image = output_canvas # The final image is the canvas with all strokes
-        styled_image.save(output_path)
+        filtered_image = output_canvas # The final image is the canvas with all strokes
+        filtered_image.save(output_path)
 
         
-    elif style=="painterly-med":
+    elif filter=="painterly-med":
         w, h = image.size
         image_array = np.array(image)
 
@@ -194,16 +194,16 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
                             # Assign the clamped color tuple
                             image_array[j, i] = (clamped_r, clamped_g, clamped_b)        
             typer.echo(f"{i*j} strokes.")
-        styled_image = Image.fromarray(image_array)
-#        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
-#        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=2))
-        styled_image = ImageOps.posterize(styled_image, 4)
-        styled_image.save(output_path)
+        filtered_image = Image.fromarray(image_array)
+#        filtered_image = filtered_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+#        filtered_image = filtered_image.filter(ImageFilter.GaussianBlur(radius=2))
+        filtered_image = ImageOps.posterize(filtered_image, 4)
+        filtered_image.save(output_path)
 
-    elif style=="painterly-hi":
+    elif filter=="painterly-hi":
         w, h = image.size
         
-        # Parameters for the style (these should come from apply_style args or have defaults)
+        # Parameters for the filter (these should come from apply_filter args or have defaults)
         num_brush_passes = num_brushes if num_brushes is not None else 3 # e.g., 3 passes
         initial_brush_diameter = brush_size if brush_size is not None else max(5, min(w,h) // 40) # Larger initial brush
         brush_diameter_step = brush_step if brush_step is not None else max(1, initial_brush_diameter // 3) # How much brush shrinks
@@ -266,15 +266,15 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
             # Optional: update current_pil_image for the next pass if you want progressive application
             # current_pil_image = Image.fromarray(output_image_array) # If next pass samples from current result
 
-        styled_image = Image.fromarray(output_image_array)
+        filtered_image = Image.fromarray(output_image_array)
         # Apply final post-processing filters
-        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+        filtered_image = filtered_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
         # Consider if this final blur is always wanted, or if its radius should be different.
         # `actual_blur_radius` here is the one from the very first brush pass's setup in your original code.
-        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=max(1, base_blur_radius // 2))) # e.g., a smaller finishing blur
-        styled_image.save(output_path)
+        filtered_image = filtered_image.filter(ImageFilter.GaussianBlur(radius=max(1, base_blur_radius // 2))) # e.g., a smaller finishing blur
+        filtered_image.save(output_path)
 
-    elif style == "painterly-lo":
+    elif filter == "painterly-lo":
         w, h = image.size
         image_array = np.array(image)
         
@@ -318,12 +318,12 @@ def apply_style(input_path, output_path, style, blur_radius=None, pixelate_block
                             # Assign the clamped color tuple
                             # Assuming you've made the fix image_array[j, i]
                             image_array[j, i] = (clamped_r, clamped_g, clamped_b)        
-        styled_image = Image.fromarray(image_array)
-        styled_image = styled_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
-        styled_image = styled_image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
-        styled_image.save(output_path)    
+        filtered_image = Image.fromarray(image_array)
+        filtered_image = filtered_image.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
+        filtered_image = filtered_image.filter(ImageFilter.GaussianBlur(radius=actual_blur_radius))
+        filtered_image.save(output_path)    
     else:
-        raise ValueError(f"Unknown style: {style}. Supported styles: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more.")
+        raise ValueError(f"Unknown filter: {filter}. Supported filters: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more.")
 
 if __name__ == '__main__':
     import traceback
@@ -340,16 +340,16 @@ if __name__ == '__main__':
         draw_test.ellipse([(100,100), (200,200)], fill=(50,200,50))
         img.save("dummy_input.png")
 
-        print("Applying blur style...")
-        apply_style("dummy_input.png", "test_outputs/styled_blur.png", "blur", blur_radius=5)
-        print("Applying impressionist style...")
-        apply_style("dummy_input.png", "test_outputs/styled_impressionist.png", "impressionist", blur_radius=8) # Example blur_radius for impressionist
-        print("Applying impressionist style (default blur)...")
-        apply_style("dummy_input.png", "test_outputs/styled_impressionist_default_blur.png", "impressionist")
-        print("Applying test-filter style (default blur)...")
-        apply_style("dummy_input.png", "test_outputs/styled_testfilter.png", "test", focus=1.5, num_brushes=2, brush_size=16, brush_step=8, blur_radius=3)
+        print("Applying blur filter...")
+        apply_filter("dummy_input.png", "test_outputs/filtered_blur.png", "blur", blur_radius=5)
+        print("Applying impressionist filter...")
+        apply_filter("dummy_input.png", "test_outputs/filtered_impressionist.png", "impressionist", blur_radius=8) # Example blur_radius for impressionist
+        print("Applying impressionist filter (default blur)...")
+        apply_filter("dummy_input.png", "test_outputs/filtered_impressionist_default_blur.png", "impressionist")
+        print("Applying test-filter (default blur)...")
+        apply_filter("dummy_input.png", "test_outputs/filtered_testfilter.png", "test", focus=1.5, num_brushes=2, brush_size=16, brush_step=8, blur_radius=3)
         
-        print(f"Example styled images saved in '{os.path.abspath('test_outputs')}' directory.")
+        print(f"Example filtered images saved in '{os.path.abspath('test_outputs')}' directory.")
         print(f"Dummy input 'dummy_input.png' created in current directory: {os.path.abspath('.')}")
 
     except ImportError:

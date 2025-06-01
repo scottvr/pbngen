@@ -42,7 +42,7 @@ python pbngen.py [OPTIONS] INPUT_FILE OUTPUT_DIRECTORY
 ```bash
 python pbngen.py my_photo.jpg ./pbn_output
 ```
-This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate complexity).
+This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` directory, and uses default settings (typically 12 colors for the PBN palette, intermediate preset).
 
 [Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki) 
 
@@ -52,10 +52,10 @@ See [Tips for Best Results](#tips-for-best-results) further down in this README.
 
 ```bash
 python pbngen.py "Vacation Pic.png" "./Vacation PBN" \
-  --style mosaic \
+  --filter mosaic \
   --bpp 8 \
   --num-colors 16 \
-  --complexity master \
+  --preset master \
   --palette-from "artist_palette.png" \
   --font-path "./fonts/Arial.ttf" \
   --label_strategy stable \
@@ -66,10 +66,10 @@ python pbngen.py "Vacation Pic.png" "./Vacation PBN" \
 ```
 This example:
 - Processes `"Vacation Pic.png"` and outputs to `"./Vacation PBN"`.
-- Applies a `mosaic` style.
+- Applies a `mosaic` filter.
 - First, pre-quantizes the input image (and `artist_palette.png`) to an 8-bit (256 colors) palette using `--bpp 8`.
 - Then, generates the final PBN using 16 colors (`--num-colors 16`), derived from the pre-quantized `artist_palette.png`.
-- Uses the `master` complexity settings (which might influence defaults if `--num-colors` wasn't specified).
+- Uses the `master` preset settings (which might influence defaults if `--num-colors` wasn't specified).
 - Uses a custom font (`Arial.ttf`) and the `stable` label mode.
 - Applies `blobbify` for a painterly effect with 5mm² minimum blob size, using 300 DPI for calculations.
 - Overwrites existing files without prompting.
@@ -85,7 +85,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/palette-pbn_legend.png`: A color swatch legend mapping numbers to the final PBN palette colors (if not `--skip-legend`).
 
 - **Intermediate Files (may be present in the output directory):**
-    - `out/styled_input.png`: If a `--style` is applied.
+    - `out/filtered_input.png`: If a `--filter` is applied.
     - `out/input-bpp_quantized.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
     - `out/bpp_quantized_palette_input.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
 
@@ -93,7 +93,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 ## Tips for Best Results
 
-- for complex images, `--style blur` almost always helps a ton.
+- for complex images, `--filter blur` almost always helps a ton.
 - for simple, clean low-color images (like logos) don't blur first
 - experiment; try both and see which gives better results
 - **likewise for the rest of the options below. Try a smaller font size. Try mixing and matching complexity presets with non-default font-size, tile-spacing, etc.**
@@ -108,8 +108,8 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 |-------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|----------------|
 | `INPUT_FILE`                  | (Positional) Path to the input image file.                                                                                                | **Required** |
 | `OUTPUT_DIRECTORY`            | (Positional) Path to the directory where output files will be saved.                                                                      | **Required** |
-| `--complexity TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
-| `--style TEXT`                | Preprocessing style to apply to the input image: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`                                                     | `None`   | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
+| `--preset TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
+| `--filter TEXT`                | Preprocessing filter to apply to the input image: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`                                                     | `None`   | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
 | `--small-region-strategy` | This allows the selection of which labeling strategy (`centroid`, `stable`, `diagonal`) should be tried when attempting to place a label in a region that is shorter or narrower than the `tile-spacing` setting. | stable |
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
 | `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
@@ -156,41 +156,41 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 ### Styling Options and Parameters
 
-The `--style TEXT` option allows you to apply a visual preprocessing effect to your input image. The available styles are `blur`, `pixelate`, and `mosaic`. You can further control the intensity or characteristics of these styles using the following parameters:
+The `--filter TEXT` option allows you to apply a visual preprocessing effect to your input image. The available filters are `blur`, `pixelate`, and `mosaic`. You can further control the intensity or characteristics of these filters using the following parameters:
 
 | Style Selected      | Parameter Flag              | Description                                                                                                        | Default Behavior (if flag not used)                                    |
 |---------------------|-----------------------------|--------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------|
-| `--style blur`      | `--blur-radius INTEGER`     | Sets the radius for the Gaussian blur effect. Higher values increase blurriness. Must be a positive integer.        | `4` (as defined in the `stylize` module)                             |
-| `--style pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
-| `--style mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
-| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly style filters that make multiple passes                                       | 1 - 3    |
-| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a style filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
+| `--filter blur`      | `--blur-radius INTEGER`     | Sets the radius for the Gaussian blur effect. Higher values increase blurriness. Must be a positive integer.        | `4` (as defined in the `stylize` module)                             |
+| `--filter pixelate`  | `--pixelate-block-size INTEGER` | Sets the size (in pixels) of the blocks for the pixelation effect. Must be a positive integer.                  | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
+| `--filter mosaic`    | `--mosaic-block-size INTEGER` | Sets the size (in pixels) of the blocks for the mosaic effect. Must be a positive integer.                         | Dynamically calculated: `max(4, min(image_width, image_height) // 64)` |
+| `--num-brushes INTEGER`       | Number of brushes to use (in order of decreasing size) in the painterly filters that make multiple passes                                       | 1 - 3    |
+| `--brush-size INTEGER`        | Size (in px) of the first (largest) brush used in a filter |    Default is calculated based on image size. I should make this integer value an area in mm^2 really.                 |
 | `--brush-step INTEGER`        | how many units (px) to step down between brush changes, where applicable.                     | Calculated based on `num-brushes` and `brush-size`.   |
-| `--focus INTEGER`             | How "tidy" the pre-pbn style filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
-| `--fervor INTEGER`            | How "manic" the pre-pbning style filter brush strokes are. Higher is more intense and takes longer.   |   1       |
+| `--focus INTEGER`             | How "tidy" the pre-pbn filter brush strokes are. Lower is more painterly and as a bonus is faster than a high number.   | 1         |
+| `--fervor INTEGER`            | How "manic" the pre-pbning filter brush strokes are. Higher is more intense and takes longer.   |   1       |
 
 -----
 
 **How to Use Styling Options:**
 
-First, select a style with `--style <style_name>`, then optionally add its corresponding parameter flag. For example:
+First, select a filter with `--filter <filter_name>`, then optionally add its corresponding parameter flag. For example:
 
 * To apply a blur with a radius of 7:
     ```bash
-    python pbngen.py input.jpg ./output --style blur --blur-radius 7
+    python pbngen.py input.jpg ./output --filter blur --blur-radius 7
     ```
 
 * To apply pixelation with a block size of 10 pixels:
     ```bash
-    python pbngen.py input.jpg ./output --style pixelate --pixelate-block-size 10
+    python pbngen.py input.jpg ./output --filter pixelate --pixelate-block-size 10
     ```
 
 * To apply the mosaic effect with its default (dynamically calculated) block size:
     ```bash
-    python pbngen.py input.jpg ./output --style mosaic
+    python pbngen.py input.jpg ./output --filter mosaic
     ```
 
-If you specify a style parameter flag (e.g., `--blur-radius`) without the corresponding `--style` flag (e.g., `--style blur`), the parameter flag will be ignored as no style is being applied. The parameter flags are only active when their associated style is selected.
+If you specify a filter parameter flag (e.g., `--blur-radius`) without the corresponding `--filter` flag (e.g., `--filter blur`), the parameter flag will be ignored as no filter is being applied. The parameter flags are only active when their associated filter is selected.
 
 ------
 
@@ -271,7 +271,7 @@ The image processing pipeline involves several stages:
 
 ```mermaid
 graph TD
-    A["Input Image"] -->|Optional: --style| B["Styled Image (if any)"];
+    A["Input Image"] -->|Optional: --filter| B["Styled Image (if any)"];
     B -->|Optional: --bpp| C["BPP Pre-quantized Image (e.g., 256 colors)"];
     C -->|--num-colors & optional --palette-from| D["Final PBN Quantized Image (e.g., 12 colors)"];
     D --> E["Segment Regions & Collect Primitives"];

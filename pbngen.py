@@ -28,7 +28,7 @@ class PBNFile(Enum):
     RASTER_OUTPUT = "raster_output"
     QUANTIZED_GUIDE = "quantized_guide"
     PALETTE_LEGEND = "palette_legend"
-    STYLED_INPUT = "styled_input"
+    FILTERED_INPUT = "filtered_input"
     BPP_QUANTIZED_INPUT = "bpp_quantized_input"
     BPP_QUANTIZED_PALETTE_INPUT = "bpp_quantized_palette_input"
     CANVAS_SCALED_INPUT = "canvas_scaled_input"
@@ -96,7 +96,7 @@ def pbn_cli(
         file_okay=False, dir_okay=True, writable=True, resolve_path=True,
     ),
     # --- General Options ---
-    complexity: Optional[str] = typer.Option(
+    preset: Optional[str] = typer.Option(
         None, help="Preset complexity level: beginner, intermediate, master."
     ),
     num_colors: Optional[int] = typer.Option(
@@ -131,35 +131,35 @@ def pbn_cli(
         help="Minimum pixel area for a color region to be processed and labeled. Default: 50 (from segment module)."
     ),
     # --- Style Options ---
-    style: Optional[str] = typer.Option(
-        None, "--style", help="Optional style: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more."
+    filter: Optional[str] = typer.Option(
+        None, "--filter", help="Optional filter: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more."
     ),
     blur_radius: Optional[int] = typer.Option(
-        None, "--blur-radius", min=1, help="Radius for 'blur' style. Default: 4"
+        None, "--blur-radius", min=1, help="Radius for 'blur' filter. Default: 4"
     ),
     edge_strength: Optional[float] = typer.Option(
         None, "--edge-strength", min=0.0, max=1.0, help="Strength of Edge Enhancement (0.0-1.0). Default: 0.5" # Added range
     ),
     focus: Optional[int] = typer.Option(
-        None, "--focus", min=1, help="How \"tidy\" brush strokes are for some styles. (default: 1)"
+        None, "--focus", min=1, help="How \"tidy\" brush strokes are for some filters. (default: 1)"
     ),
     fervor: Optional[int] = typer.Option(
-        None, "--fervor", min=1, help="How \"manic\" brush strokes are for some styles. (default: 1)"
+        None, "--fervor", min=1, help="How \"manic\" brush strokes are for some filters. (default: 1)"
     ),
     brush_size: Optional[int] = typer.Option(
-        None, "--brush-size", min=1, help="Base brush diameter for some styles."
+        None, "--brush-size", min=1, help="Base brush diameter for some filters."
     ),
     brush_step: Optional[int] = typer.Option(
-        None, "--brush-step", min=1, help="Brush size increment for iterative styles." # Changed min to 1
+        None, "--brush-step", min=1, help="Brush size increment for iterative filters." # Changed min to 1
     ),
     num_brushes: Optional[int] = typer.Option(
-        None, "--num-brushes", min=1, help="Number of passes for iterative brush styles."
+        None, "--num-brushes", min=1, help="Number of passes for iterative brush filters."
     ),
     pixelate_block_size: Optional[int] = typer.Option(
-        None, "--pixelate-block-size", min=1, help="Block size for 'pixelate' style. Default: dynamic."
+        None, "--pixelate-block-size", min=1, help="Block size for 'pixelate' filter. Default: dynamic."
     ),
     mosaic_block_size: Optional[int] = typer.Option(
-        None, "--mosaic-block-size", min=1, help="Block size for 'mosaic' style. Default: dynamic."
+        None, "--mosaic-block-size", min=1, help="Block size for 'mosaic' filter. Default: dynamic."
     ),
     # --- Font and Label Options ---
     font_path: Optional[Path] = typer.Option(
@@ -213,7 +213,7 @@ def pbn_cli(
     if not raster_only: expected_outputs.append("vector_output")
     output_paths = validate_output_dir(output_dir, overwrite=yes, expect=expected_outputs)
 
-    styled_path = output_paths["styled_input"]
+    filtered_path = output_paths["filtered_input"]
     bpp_quantized_input_path = output_paths["bpp_quantized_input"]
     bpp_quantized_palette_path = output_paths["bpp_quantized_palette_input"] # Corrected from source
     canvas_scaled_input_path = output_paths["canvas_scaled_input"]
@@ -232,9 +232,9 @@ def pbn_cli(
         "intermediate": {"num_colors": 12, "tile_spacing": 20, "font_size": 10, "label_strategy": "stable"},
         "master": {"num_colors": 24, "tile_spacing": 10, "font_size": 12, "label_strategy": "stable"},
     }
-    if complexity and complexity in presets:
-        typer.echo(f"Applying preset complexity: '{complexity}'")
-        preset_values = presets[complexity]
+    if preset and preset in presets:
+        typer.echo(f"Applying preset complexity: '{preset}'")
+        preset_values = presets[preset]
         if effective_pbn_num_colors is None: effective_pbn_num_colors = preset_values["num_colors"]
         if effective_tile_spacing is None: effective_tile_spacing = preset_values["tile_spacing"]
         if effective_font_size is None: effective_font_size = preset_values["font_size"]
@@ -264,20 +264,20 @@ def pbn_cli(
     else: typer.echo(f"Using user-provided DPI: {effective_dpi_val}")
 
     current_input_image_path_for_processing: Path = input_path
-    if style:
+    if filter:
         try:
-            typer.echo(f"Applying style '{style}'...")
+            typer.echo(f"Applying filter '{filter}'...")
             # Ensure all relevant params are passed to stylize
-            stylize.apply_style(input_path, styled_path, style, 
+            stylize.apply_filter(input_path, filtered_path, filter, 
                                 blur_radius=blur_radius, edge_strength=edge_strength,
                                 pixelate_block_size=pixelate_block_size, 
                                 mosaic_block_size=mosaic_block_size, 
                                 num_brushes=num_brushes, brush_size=brush_size, 
                                 brush_step=brush_step, focus=focus, fervor=fervor) # Added fervor
-            current_input_image_path_for_processing = styled_path
-            typer.echo(f"Styled image saved to: {styled_path}")
+            current_input_image_path_for_processing = filtered_path
+            typer.echo(f"Styled image saved to: {filtered_path}")
         except ValueError as e: typer.secho(f"Styling error: {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
-        except Exception as e: typer.secho(f"Unexpected error applying style: {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
+        except Exception as e: typer.secho(f"Unexpected error applying filter: {e}", fg=typer.colors.RED); traceback.print_exc(); raise typer.Exit(code=1)
 
     path_to_main_image_for_canvas_scaling: Path = current_input_image_path_for_processing
     path_to_palette_image_for_extraction: Optional[Path] = palette_from
@@ -464,7 +464,7 @@ def pbn_cli(
     if no_cruft:
         typer.echo("\n--no-cruft active: Cleaning up intermediate files...")
         cruft_file_keys = [
-            "styled_input", "bpp_quantized_input", 
+            "filtered_input", "bpp_quantized_input", 
             "bpp_quantized_palette_input", # Was bpp_quantized_palette_source in previous version
             "canvas_scaled_input"
         ]

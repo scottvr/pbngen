@@ -46,11 +46,11 @@ def write_svg(
                     elif font_path_obj.suffix.lower() == ".woff2":
                         font_mime_type = "font/woff2"
 
-                    style_def = f"@font-face {{"
-                    style_def += f"font-family: '{font_family_svg}';"
-                    style_def += f"src: url(data:{font_mime_type};base64,{font_data_b64});"
-                    style_def += f"}}"
-                    dwg.defs.add(dwg.style(style_def))
+                    filter_def = f"@font-face {{"
+                    filter_def += f"font-family: '{font_family_svg}';"
+                    filter_def += f"src: url(data:{font_mime_type};base64,{font_data_b64});"
+                    filter_def += f"}}"
+                    dwg.defs.add(dwg.filter(filter_def))
                 except Exception as e:
                     print(f"Warning: Could not embed font {font_path_str} into SVG: {e}")
                     # Fallback to using font_family_svg name, assuming it might be installed

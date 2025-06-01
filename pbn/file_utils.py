@@ -5,7 +5,7 @@ from typing import Optional, Dict
 
 default_file_names = {
     "bpp_quantized_input": "input-bpp_quantized.png",
-    "styled_input": "input-styled.png", 
+    "filtered_input": "input-filtered.png", 
     "canvas_scaled_input": "input-canvas_scaled.png", 
     "bpp_quantized_palette_input": "input_palette-bpp_quantized.png",
     "quantized_guide": "pbn_guide-ncolor_quantized.png", 
