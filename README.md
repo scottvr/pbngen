@@ -127,7 +127,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `--dither`                             | Enable dithering in the final PBN color quantization stage.                                                                                                             | `False`                  |
 | `--frequency-sort-palette` /<br>`--no-frequency-sort-palette` | Sort PBN palette by color frequency (most used first). Use `--no-frequency-sort-palette` to disable.                                                                | `True`                   |
 | **Image Pre-processing & Styling** |                                                                                                                                                                         |                          |
-| `--filter TEXT`                        | Preprocessing filter. Options: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`, `smooth`, `smooth_more`. See "Styling Options" table.       | `None`                   |
+| `--filter TEXT`                        | Preprocessing filter(s). Can be specified multiple times to chain filters sequentially. Options: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`, `smooth`, `smooth_more`. See "Filter Options" and "Chaining Filters" below. | `None`                   |
 | **Segmentation & Region Control** |                                                                                                                                                                         |                          |
 | `--min-region-area INTEGER`            | Minimum pixel area for a color region to be processed and labeled. Must be >= 1.                                                                                        | `None` (internal: 50)    |
 | `--interpolate-contours` /<br>`--no-interpolate-contours` | Smooth contour lines. Use `--no-interpolate-contours` for simpler SVGs.                                                                                             | `True`                   |
@@ -165,7 +165,7 @@ Presets provide a quick way to set multiple options for different levels of deta
 
 ### Filter Options
 
-The `--filter TEXT` option allows you to apply a visual preprocessing effect to your input image.
+The `--filter TEXT` option allows you to apply a visual preprocessing effect to your input image. Multiple filters can be chained (see "Chaining Filters" below).
 
 | Name           | Description                              |
 |----------------|------------------------------------------|
@@ -178,6 +178,27 @@ The `--filter TEXT` option allows you to apply a visual preprocessing effect to 
 | `painterly-med`| Intermediate painterly effect.           |
 | `painterly-hi` | Advanced painterly effect.               |
 *(Filter options from pbngen.py help text)*
+
+### Chaining Filters
+
+PbNgen allows you to apply multiple image filters in a sequence, a process known as filter chaining. This can be useful for achieving more complex or refined stylistic effects by building upon the results of previous filters.
+
+To chain filters, simply specify the --filter option multiple times on the command line. The filters will be applied in the order they are provided. The output of one filter automatically becomes the input for the next filter in the chain.
+
+**Example:**
+
+If you want to first apply a blur filter to soften your image and then apply a painterly-med filter for an artistic touch, you would use the following command:
+
+``` bash
+
+```
+In this command:
+
+1. your_image.jpg is initially processed by the blur filter.
+2. The resulting blurred image is then passed as input to the painterly-med filter.
+3. The output from the painterly-med filter is what proceeds to the subsequent stages of the PbNgen pipeline (e.g., color quantization, segmentation).
+
+This sequential application allows for a highly customizable preprocessing workflow to get your image just right before it's converted into a paint-by-number.
 
 ### Styling Options and Parameters
 
