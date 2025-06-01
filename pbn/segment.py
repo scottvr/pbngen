@@ -370,7 +370,7 @@ def render_raster_from_primitives(
         # Draw outlines
         for contour_points_list in region_primitive.get("outline", []):
             if len(contour_points_list) > 1:
-                 draw.line(contour_points_list, fill=outline_render_color_rgb, width=1) # <-- USE CONVERTED RGB TUPLE
+                 draw.line(contour_points_list, fill=outline_render_color_rgb, width=1) 
             elif contour_points_list:
                  draw.point(contour_points_list[0], fill=outline_render_color_rgb)        
 
@@ -387,7 +387,7 @@ def render_raster_from_primitives(
             try:
                 # Attempt to use "mm" (middle-middle) anchor if available
                 draw.text((float(lx), effective_y_center_for_anchor), text_value,
-                          font=font_to_use, fill=label_text_color, anchor="mm") # <-- USE label_text_color
+                          font=font_to_use, fill=label_text_color, anchor="mm") 
             except (TypeError, AttributeError, ValueError): # Fallback for older Pillow or if anchor="mm" fails
                 # Manually calculate position to simulate middle anchor
                 text_width, text_height = 0, 0
@@ -410,7 +410,7 @@ def render_raster_from_primitives(
                 draw_y = effective_y_center_for_anchor - (text_height / 2.0)
                 
                 draw.text((draw_x, draw_y), text_value,
-                          font=font_to_use, fill=label_text_color) # <-- USE label_text_color
+                          font=font_to_use, fill=label_text_color) 
     return output_img
 
 def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fixed_font_size, interpolate_contours=True):

@@ -99,7 +99,7 @@ def write_svg(
             dwg.add(dwg.text(
                 str(label["value"]), # Ensure value is string
                 insert=(int(x), int(y)),
-                fill=label_color_str, # <-- MODIFIED: Use the new label_color_str parameter
+                fill=label_color_str, 
                 # stroke=label_color, # Usually not needed if fill is present, can make text look thicker
                 font_family=font_family_svg, # Apply the determined font family
                 font_size=f"{font_size_label}px", # Add units

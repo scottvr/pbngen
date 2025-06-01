@@ -131,8 +131,7 @@ def pbn_cli(
         help="Minimum pixel area for a color region to be processed and labeled. Default: 50 (from segment module)."
     ),
     # --- Style Options ---
-    # MODIFIED: filter type is now List[str] to accept multiple --filter options
-    filter: Optional[List[str]] = typer.Option( # <--- MODIFIED HERE
+    filter: Optional[List[str]] = typer.Option(  
         None, "--filter", help="Optional filter(s) to apply sequentially: blur, pixelate, mosaic, painterly-[lo,med,hi], smooth, smooth_more. Can be specified multiple times."
     ),
     blur_radius: Optional[int] = typer.Option(
