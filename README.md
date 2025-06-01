@@ -8,7 +8,7 @@ The **LeadEngine** (aka [Pb](https://wikipedia.com/wiki/lead)Ngen, that's "lead"
 - Two-stage color quantization:
     - Optional initial global color reduction using Bits Per Pixel (`--bpp`).
     - Final PBN palette generation using a specific number of colors (`--num-colors`).
-- Style preprocessing: `blur`, `pixelate`, `mosaic`, and a poorly-named `"impressionist"` filter.
+- Style preprocessing: `blur`, `pixelate`, `mosaic`, painterly and smoothing filters
 - Complexity presets for beginner to master-level detail.
 - Label placement strategies: `diagonal`, `centroid`, `stable`.
 - Custom font support for overlays and legend.
@@ -109,7 +109,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | `INPUT_FILE`                  | (Positional) Path to the input image file.                                                                                                | **Required** |
 | `OUTPUT_DIRECTORY`            | (Positional) Path to the directory where output files will be saved.                                                                      | **Required** |
 | `--preset TEXT`           | Preset detail level: `beginner`, `intermediate`, `master`. Affects defaults for `num-colors`, `tile-spacing`, `font-size`.                | `None`         |
-| `--filter TEXT`                | Preprocessing filter to apply to the input image: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`                                                     | `None`   | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
+| `--filter TEXT`                | Preprocessing filter to apply to the input image: `blur`, `pixelate`, `mosaic`, `painterly-lo`, `painterly-med`, `painterly-hi`, `smooth`, `smooth_more`                                                     | `None`   | `--min-region-area INTEGER` | Minimum pixel area for a color region to be processed and included in the final output. Regions smaller than this will be discarded. Useful for controlling detail and noise. Must be a positive integer. | 50 (from segmentation logic) |
 | `--small-region-strategy` | This allows the selection of which labeling strategy (`centroid`, `stable`, `diagonal`) should be tried when attempting to place a label in a region that is shorter or narrower than the `tile-spacing` setting. | stable |
 | `--num-colors INTEGER`        | Final number of colors for the PBN palette.                                                                                               | 12             |
 | `--bpp INTEGER`               | Bits Per Pixel (1-8) for an *initial* color depth reduction (e.g., 8 for 256 colors). Applied before `--num-colors` processing.            | `None`         |
@@ -147,12 +147,13 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 | Name       | Description                              |
 |------------|------------------------------------------|
 | `blur`     | Applies a Gaussian blur.                 |
+| `Smooth`     | Applies a bilateral blur. |
+| `smooth_more`     | Applies more bilateral blur.|
 | `pixelate` | Chunky low-resolution pixelation.        |
 | `mosaic`   | Pixelate and upscale for blended effect. |
 | `painterly` | Make the source image look more "painterly" before beginning the PBN conversion. |
 | `painterly-med`  | A slightly-better attempt at the above. Introduces the --brush-* options elsewhere described. |
 | `painterly-hi` | About on par with the previous, but responds to `fervor` rather than `focus` and behaves differently in the lack of --brush-* arguments |
-
 
 ### Styling Options and Parameters
 
