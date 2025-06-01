@@ -132,7 +132,7 @@ def pbn_cli(
     ),
     # --- Style Options ---
     filter: Optional[str] = typer.Option(
-        None, "--filter", help="Optional filter: blur, pixelate, mosaic, impressionist, test, test2, smooth, smooth_more."
+        None, "--filter", help="Optional filter: blur, pixelate, mosaic, painterly-[lo,med,hi], smooth, smooth_more."
     ),
     blur_radius: Optional[int] = typer.Option(
         None, "--blur-radius", min=1, help="Radius for 'blur' filter. Default: 4"
