@@ -2,6 +2,8 @@
 
 [Pb](https://wikipedia.com/wiki/lead)Ngen, (that's PbN as in paint-by-numbers, gen as in generator. Or Pb as in "lead" as in paint, and Ngen as in engine; one might call it The LeadEngine, but I don't expect anyone to call it anything other than pbngen) is a command-line tool that converts any image into a printable, paint-by-number guide. It reduces images to a fixed color palette, segments the result into paintable regions, overlays numeric labels, and generates both raster and vector outputs along with a color swatch legend.
 
+[Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
+
 ## Features
 
 - Converts any image into paint-by-number format.
