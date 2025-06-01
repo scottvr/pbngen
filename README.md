@@ -115,6 +115,8 @@ For each generated PNG and SVG file, PBNgen typically embeds:
 
 This embedded metadata ensures that crucial information about the provenance and generation parameters of your PBNgen assets is self-contained within the files themselves, promoting better organization and reproducibility.
 
+-----
+
 ## Tips for Best Results
 
 - for complex images, `--filter blur` almost always helps a ton.
