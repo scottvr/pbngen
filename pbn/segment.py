@@ -1,6 +1,6 @@
 from skimage.measure import regionprops, find_contours
 from skimage.measure import label as sklabel
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageColor
 import numpy as np # keep np for type hints
 import os
 # import typer # Removed, was not used for its primary CLI purpose here
