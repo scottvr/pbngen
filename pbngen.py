@@ -356,7 +356,7 @@ def pbn_cli(
                         output_path_for_this_filter_step,
                         command_line_invocation=command_line_str,
                         additional_metadata={
-                            "PBNgen-FileType": "Intermediate Filtered Image" if not is_last_filter else "Final Filtered Input",
+                            "PbNgen-FileType": "Intermediate Filtered Image" if not is_last_filter else "Final Filtered Input",
                             "SourceImage": str(temp_input_for_current_filter_step_path),
                             "FilterApplied": filter_name,
                             "FilterStep": f"{i+1}/{len(filter)}"
@@ -397,7 +397,7 @@ def pbn_cli(
                     bpp_quantized_input_path,
                     command_line_invocation=command_line_str,
                     additional_metadata={
-                        "PBNgen-FileType": "BPP Pre-quantized Input", # Using PBNFile.BPP_QUANTIZED_INPUT.value
+                        "PbNgen-FileType": "BPP Pre-quantized Input", # Using PBNFile.BPP_QUANTIZED_INPUT.value
                         "SourceImage": str(current_input_image_path_for_processing),
                         "BPP": str(bpp),
                         "QuantColors": str(num_bpp_quant_colors)
@@ -417,7 +417,7 @@ def pbn_cli(
                         bpp_quantized_palette_path,
                         command_line_invocation=command_line_str,
                         additional_metadata={
-                            "PBNgen-FileType": "BPP Pre-quantized Palette Source", # Using PBNFile.BPP_QUANTIZED_PALETTE_INPUT.value
+                            "PbNgen-FileType": "BPP Pre-quantized Palette Source", # Using PBNFile.BPP_QUANTIZED_PALETTE_INPUT.value
                             "SourcePaletteImage": str(palette_from),
                             "BPP": str(bpp),
                             "QuantColors": str(num_bpp_quant_colors)
@@ -467,7 +467,7 @@ def pbn_cli(
                     canvas_scaled_input_path,
                     command_line_invocation=command_line_str,
                     additional_metadata={
-                        "PBNgen-FileType": "Canvas Scaled Input", # Using PBNFile.CANVAS_SCALED_INPUT.value
+                        "PbNgen-FileType": "Canvas Scaled Input", # Using PBNFile.CANVAS_SCALED_INPUT.value
                         "SourceImage": str(path_to_main_image_for_canvas_scaling),
                         "TargetCanvasSize": f"{target_canvas_width_px}x{target_canvas_height_px}px",
                         "EffectiveDPI": str(dpi_for_canvas)
@@ -504,7 +504,7 @@ def pbn_cli(
                 quantized_pbn_path, # This is output_paths[PBNFile.QUANTIZED_GUIDE]
                 command_line_invocation=command_line_str,
                 additional_metadata={
-                    "PBNgen-FileType": "PBN Quantized Guide", # Descriptive, or PBNFile.QUANTIZED_GUIDE.value
+                    "PbNgen-FileType": "PBN Quantized Guide", # Descriptive, or PBNFile.QUANTIZED_GUIDE.value
                     "SourceImage": str(path_to_main_image_for_pbn_quantization),
                     "NumColorsTarget": str(effective_pbn_num_colors),
                     "NumColorsActual": str(len(final_pbn_palette)),
@@ -609,7 +609,7 @@ def pbn_cli(
         try:
             # Prepare metadata for SVG
             svg_metadata = {
-                "PBNgen-FileType": "Vector PBN Output", # Or PBNFile.VECTOR_OUTPUT.value
+                "PbNgen-FileType": "Vector PBN Output", # Or PBNFile.VECTOR_OUTPUT.value
                 "SourceQuantizedGuide": str(quantized_pbn_path.name),
                 "PaletteColors": str(len(final_pbn_palette)),
                 "LabelStrategy": effective_label_strategy or "default",
@@ -646,7 +646,7 @@ def pbn_cli(
             labeled_path, # Path object
             command_line_invocation=command_line_str,
             additional_metadata={
-                "PBNgen-FileType": "Labeled Raster PBN Output", # Or PBNFile.RASTER_OUTPUT.value
+                "PbNgen-FileType": "Labeled Raster PBN Output", # Or PBNFile.RASTER_OUTPUT.value
                 "SourceQuantizedGuide": str(quantized_pbn_path.name), # Use .name for relative path in metadata
                 "PaletteColors": str(len(final_pbn_palette)),
                 "LabelStrategy": effective_label_strategy or "default",
@@ -673,7 +673,7 @@ def pbn_cli(
 
             if legend_pil_image:
                 additional_legend_metadata = {
-                    "PBNgen-FileType": "Palette Legend", # Or PBNFile.PALETTE_LEGEND.value
+                    "PbNgen-FileType": "Palette Legend", # Or PBNFile.PALETTE_LEGEND.value
                     "PaletteColors": str(len(final_pbn_palette)),
                     "SwatchSize": str(swatch_size),
                     "LegendFontSize": str(effective_font_size)

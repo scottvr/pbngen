@@ -10,9 +10,9 @@ PNG_METADATA_PREFIX = "pbngen:" #
 
 def extract_png_metadata(filepath: Path):
     """
-    Extracts and prints PBNgen metadata from a PNG file.
+    Extracts and prints PbNgen metadata from a PNG file.
     """
-    print(f"--- PBNgen Metadata for PNG: {filepath.name} ---")
+    print(f"--- PbNgen Metadata for PNG: {filepath.name} ---")
     try:
         with Image.open(filepath) as img:
             # Metadata is typically in img.info (which often includes .text items)
@@ -27,7 +27,7 @@ def extract_png_metadata(filepath: Path):
                         found_metadata = True
             
             if not found_metadata:
-                print("  No PBNgen-specific metadata found.")
+                print("  No PbNgen-specific metadata found.")
 
     except FileNotFoundError:
         print(f"Error: File not found at {filepath}")
@@ -38,9 +38,9 @@ def extract_png_metadata(filepath: Path):
 
 def extract_svg_metadata(filepath: Path):
     """
-    Extracts and prints PBNgen metadata from an SVG file.
+    Extracts and prints PbNgen metadata from an SVG file.
     """
-    print(f"--- PBNgen Metadata for SVG: {filepath.name} ---")
+    print(f"--- PbNgen Metadata for SVG: {filepath.name} ---")
     
     SVG_NS = 'http://www.w3.org/2000/svg'  # Standard SVG Namespace
 
@@ -62,7 +62,7 @@ def extract_svg_metadata(filepath: Path):
             for child in root:
                 if child.tag == f'{{{SVG_NS}}}metadata':
                     metadata_element = child
-                    print(f"  Note: Found a general <metadata> block (not id='pbngenApplicationMetadata'). Inspecting its PBNgen content...")
+                    print(f"  Note: Found a general <metadata> block (not id='pbngenApplicationMetadata'). Inspecting its PbNgen content...")
                     break # Use the first one found
 
         if metadata_element is not None:
@@ -74,7 +74,7 @@ def extract_svg_metadata(filepath: Path):
                     found_pbngen_metadata = True
             
             if not found_pbngen_metadata:
-                print(f"  The <metadata> block was found, but it contains no PBNgen-specific elements in the '{PBNGEN_SVG_NS_URI}' namespace.")
+                print(f"  The <metadata> block was found, but it contains no PbNgen-specific elements in the '{PBNGEN_SVG_NS_URI}' namespace.")
         else:
             print(f"  No <metadata> block (id='pbngenApplicationMetadata' or any standard svg:metadata) found in '{filepath.name}'.") # Updated message
 

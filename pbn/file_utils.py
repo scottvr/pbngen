@@ -170,7 +170,7 @@ def save_pbn_svg(
 
     # 3. Add your specific metadata items into the custom_metadata_et element
     software_el = SubElement(custom_metadata_et, f'{{{pbngen_ns_uri_for_custom_tags}}}Software')
-    software_el.text = "pbngen by Scott Vardy (https://github.com/scottvr/pbngen)"
+    software_el.text = "pbngen by Scott VR (https://github.com/scottvr/pbngen)"
 
     if command_line_invocation:
         cli_el = SubElement(custom_metadata_et, f'{{{pbngen_ns_uri_for_custom_tags}}}CommandLineInvocation')

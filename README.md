@@ -95,41 +95,41 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 ### Embedded File Metadata
 
-PBNgen automatically embeds useful metadata directly into the output PNG and SVG files it generates. This feature helps you keep track of precisely how each file was created, making it easier to manage different versions or reproduce results without relying on complex filenames or separate notes.
+PbNgen automatically embeds useful metadata directly into the output PNG and SVG files it generates. This feature helps you keep track of precisely how each file was created, making it easier to manage different versions or reproduce results without relying on complex filenames or separate notes.
 
 **What Information is Stored?**
 
-For each generated PNG and SVG file, PBNgen typically embeds:
+For each generated PNG and SVG file, PbNgen typically embeds:
 
 * **Full Command-Line Invocation:** The exact command, options, and arguments you used to run `pbngen` for that specific file. This is stored with a key like `pbngen:command_line` (PNG) or in a `CommandLineInvocation` tag (SVG).
 * **Processing Details:** Context-specific information about the generation process. This can include:
-    * `PBNgen-FileType`: The role of the generated file (e.g., "Labeled Raster PBN Output", "Vector PBN Canvas", "BPP Pre-quantized Input").
+    * `PbNgen-FileType`: The role of the generated file (e.g., "Labeled Raster PBN Output", "Vector PBN Canvas", "BPP Pre-quantized Input").
     * Source file paths (e.g., `SourceImage`, `SourceQuantizedGuide`).
     * Key parameters used (e.g., `PaletteColors`, `BPP`, `TargetCanvasSize`, `LabelStrategy`, `FontSize`).
     * Other relevant settings.
 
 **How and Where Metadata is Stored:**
 
-* **PNG Files:** Metadata is embedded as text chunks within the PNG file structure. Keys for this information are generally prefixed with `pbngen:` (e.g., `pbngen:PBNgen-FileType`). You can often view these text chunks using metadata inspection tools like `exiftool` or some advanced image editors.
-* **SVG Files:** Metadata is stored within a standard `<metadata>` block inside the SVG XML structure. Custom PBNgen-specific elements (like `PBNgen_FileType`, `PaletteColors`, etc.) are namespaced using the URI `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#`. This means each custom metadata tag will typically have an `xmlns` attribute pointing to this URI when serialized by `xml.etree.ElementTree`. You can view this metadata by opening the SVG file in a text editor or an XML-aware SVG editor.
+* **PNG Files:** Metadata is embedded as text chunks within the PNG file structure. Keys for this information are generally prefixed with `pbngen:` (e.g., `pbngen:PbNgen-FileType`). You can often view these text chunks using metadata inspection tools like `exiftool` or some advanced image editors.
+* **SVG Files:** Metadata is stored within a standard `<metadata>` block inside the SVG XML structure. Custom PbNgen-specific elements (like `PbNgen_FileType`, `PaletteColors`, etc.) are namespaced using the URI `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#`. This means each custom metadata tag will typically have an `xmlns` attribute pointing to this URI when serialized by `xml.etree.ElementTree`. You can view this metadata by opening the SVG file in a text editor or an XML-aware SVG editor.
 
-This embedded metadata ensures that crucial information about the provenance and generation parameters of your PBNgen assets is self-contained within the files themselves, promoting better organization and reproducibility.
+This embedded metadata ensures that crucial information about the provenance and generation parameters of your PbNgen assets is self-contained within the files themselves, promoting better organization and reproducibility.
 
 ### Viewing Embedded Metadata with `extract_pbngen_meta.py`
 
-To complement the embedded metadata feature, this project includes a standalone Python script called `extract_pbngen_meta.py`. This utility provides a simple way to read and display the custom PBNgen-specific metadata from your generated PNG and SVG files directly from the command line.
+To complement the embedded metadata feature, this project includes a standalone Python script called `extract_pbngen_meta.py`. This utility provides a simple way to read and display the custom PbNgen-specific metadata from your generated PNG and SVG files directly from the command line.
 
 **Key Features of the Extractor:**
 
 * **Supports both PNG and SVG files:** The script automatically detects the file type and uses the appropriate method to parse and extract the metadata.
 * **Python-based:** It utilizes the Pillow (PIL) library for reading PNG metadata and Python's built-in `xml.etree.ElementTree` for SVG metadata. This means it works as a standalone Python tool without needing external applications like `exiftool` configured for these specific custom tags.
-* **PBNgen-Specific:** The script is tailored to find and display:
+* **PbNgen-Specific:** The script is tailored to find and display:
     * In PNGs: Textual data chunks where the keyword is prefixed with `pbngen:` (e.g., `pbngen:command_line`).
-    * In SVGs: Custom XML elements within the `<metadata>` block that belong to the `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#` namespace (e.g., `CommandLineInvocation`, `PBNgen_FileType`).
+    * In SVGs: Custom XML elements within the `<metadata>` block that belong to the `http://www.github.com/scottvr/pbngen/assets/ns/pbngen#` namespace (e.g., `CommandLineInvocation`, `PbNgen_FileType`).
 
 **How to Use:**
 
-Run the script from your terminal, providing the path to the PBNgen-generated file you wish to inspect:
+Run the script from your terminal, providing the path to the PbNgen-generated file you wish to inspect:
 
     ```bash
     python extract_pbngen_meta.py your_output_file.png
@@ -139,7 +139,7 @@ Run the script from your terminal, providing the path to the PBNgen-generated fi
     python extract_pbngen_meta.py your_output_file.svg
     ```
 
-The script will then print out all the PBNgen-specific key-value metadata pairs it discovers within the specified file, giving you a quick and easy way to verify or recall the generation parameters.
+The script will then print out all the PbNgen-specific key-value metadata pairs it discovers within the specified file, giving you a quick and easy way to verify or recall the generation parameters.
 -----
 
 ## Tips for Best Results
