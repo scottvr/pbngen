@@ -139,12 +139,10 @@ Run the script from your terminal, providing the path to the PbNgen-generated fi
     python extract_pbngen_meta.py your_output_file.svg
     ```
 
-<<<<<<< HEAD
-The script will then print out all the PbNgen-specific key-value metadata pairs it discovers within the specified file, giving you a quick and easy way to verify or recall the generation parameters.
 =======
+
 The script will then print out all the PBNgen-specific key-value metadata pairs it discovers within the specified file, giving you a quick and easy way to verify or recall the generation parameters.
 
->>>>>>> c7656ea43093b8689d5590a774d1d9112d8af2ad
 -----
 
 ## Tips for Best Results
