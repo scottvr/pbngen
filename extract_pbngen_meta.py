@@ -41,40 +41,42 @@ def extract_svg_metadata(filepath: Path):
     Extracts and prints PBNgen metadata from an SVG file.
     """
     print(f"--- PBNgen Metadata for SVG: {filepath.name} ---")
+    
+    SVG_NS = 'http://www.w3.org/2000/svg'  # Standard SVG Namespace
+
     try:
         tree = ET.parse(filepath)
-        root = tree.getroot()
-        
-        # Find the <metadata> element.
-        # According to your file_utils.py, it has id="pbngenApplicationMetadata"
-        # However, ElementTree's find doesn't support attribute selection directly in older Pythons without lxml.
-        # We'll iterate or use a more general find.
+        root = tree.getroot() # This is the <svg> element
         
         metadata_element = None
-        # Try to find by specific ID if possible, or generic 'metadata' tag
-        # XPath like './/metadata[@id="pbngenApplicationMetadata"]' would be ideal but needs lxml or careful handling.
-        # For simplicity, we find the first 'metadata' tag. If there are multiple, this might need refinement.
-        for elem in root.findall('.//{*}metadata'): # Search for 'metadata' in any namespace
-            if elem.get('id') == 'pbngenApplicationMetadata': #
-                metadata_element = elem
+        
+        # Look for the <metadata> element (which should be in the SVG namespace)
+        # as a direct child of the root <svg> element.
+        for child in root: # Iterate direct children of <svg>
+            if child.tag == f'{{{SVG_NS}}}metadata' and child.get('id') == 'pbngenApplicationMetadata':
+                metadata_element = child
                 break
-        if metadata_element is None: # Fallback if ID not found or not unique
-            metadata_element = root.find('.//{*}metadata')
-
+        
+        # Fallback: If not found with specific ID, find the first svg:metadata
+        if metadata_element is None:
+            for child in root:
+                if child.tag == f'{{{SVG_NS}}}metadata':
+                    metadata_element = child
+                    print(f"  Note: Found a general <metadata> block (not id='pbngenApplicationMetadata'). Inspecting its PBNgen content...")
+                    break # Use the first one found
 
         if metadata_element is not None:
-            found_metadata = False
-            for child in metadata_element:
-                # ElementTree stores namespaced tags as "{namespace_uri}local_name"
-                if child.tag.startswith(f'{{{PBNGEN_SVG_NS_URI}}}'):
-                    local_name = child.tag.split('}', 1)[1]
-                    print(f"  {local_name}: {child.text.strip() if child.text else ''}")
-                    found_metadata = True
+            found_pbngen_metadata = False
+            for custom_elem in metadata_element:
+                if custom_elem.tag.startswith(f'{{{PBNGEN_SVG_NS_URI}}}'):
+                    local_name = custom_elem.tag.split('}', 1)[1]
+                    print(f"  {local_name}: {custom_elem.text.strip() if custom_elem.text else ''}")
+                    found_pbngen_metadata = True
             
-            if not found_metadata:
-                print(f"  No PBNgen-specific metadata elements found within the <metadata> block of '{filepath.name}'.")
+            if not found_pbngen_metadata:
+                print(f"  The <metadata> block was found, but it contains no PBNgen-specific elements in the '{PBNGEN_SVG_NS_URI}' namespace.")
         else:
-            print(f"  No <metadata> block found in '{filepath.name}'.")
+            print(f"  No <metadata> block (id='pbngenApplicationMetadata' or any standard svg:metadata) found in '{filepath.name}'.") # Updated message
 
     except FileNotFoundError:
         print(f"Error: File not found at {filepath}")
