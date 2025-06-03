@@ -29,7 +29,7 @@ pip install -r requirements.txt
 
 **Note: if using GPU, please ensure you have CUDA correctly configured, and you will need to `pip install cupy` if it isn't already in your environment.**
 
-Windows users: see [section on GPU under WSL](#note-concerning-scikit-learn-cuml-gpu-acceleration-on-windows)
+Windows users: see [section on GPU under WSL](#note-concerning-cuml-gpu-acceleration-on-windows)
 ## Usage
 
 The script is invoked directly, followed by options, the input image file, and the output directory.
