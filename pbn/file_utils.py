@@ -22,16 +22,20 @@ class Verbatim(BaseElement):
 
     def write(self, fileobj, indent=0, newline='\n', options={}):
         current_elementname = getattr(self, 'elementname', 'ERROR: NOT SET IN WRITE')
-        if current_elementname and not options.get('skip_validation', False) and hasattr(self, 'validator'):
-            if not isinstance(self.validator, svgwrite.validator2.NullValidator):
+        validator = getattr(self, 'validator', None)
+    
+        # Only try to validate if validator exists and has _get_element
+        if current_elementname and not options.get('skip_validation', False) and validator:
+            if hasattr(validator, "_get_element"):
                 try:
-                    self.validator._get_element(current_elementname)
+                    validator._get_element(current_elementname)
                 except KeyError as e:
                     raise
             else:
-                print(f"DEBUG: Verbatim.write: Using NullValidator for '{current_elementname}', skipping _get_element call.")
+                print(f"DEBUG: Verbatim.write: validator has no _get_element method, skipping validation.")
         else:
             print(f"DEBUG: Verbatim.write: Skipping validation for '{current_elementname}'.")
+    
         fileobj.write(self.xml_string)
         print(f"DEBUG: Verbatim.write for '{current_elementname}' completed.")
 
