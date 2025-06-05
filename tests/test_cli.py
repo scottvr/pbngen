@@ -38,10 +38,10 @@ def test_pbngen_cli_with_all_outputs(tmp_path):
 
     # Expected output file basenames
     expected_files = [
-        "vector-pbn_canvas.svg",
-        "raster-pbn_canvas.png",
-        "pbn_guide-ncolor_quantized.png",
-        "palette-pbn_legend.png",
+        "pbn-vector_canvas.svg",
+        "pbn-raster_canvas.png",
+        "pbn-guide_ncolor_quantized.png",
+        "pbn-palette_legend.png",
     ]
 
     for filename in expected_files:

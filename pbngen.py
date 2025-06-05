@@ -37,13 +37,13 @@ class PBNFile(Enum):
 
 # Map PBNFile enum members to their base filenames
 PBN_FILE_BASENAMES: Dict[PBNFile, str] = {
-    PBNFile.VECTOR_OUTPUT: "vector-pbn_canvas.svg",
-    PBNFile.RASTER_OUTPUT: "raster-pbn_canvas.png",
-    PBNFile.QUANTIZED_GUIDE: "pbn_guide-ncolor_quantized.png",
-    PBNFile.PALETTE_LEGEND: "palette-pbn_legend.png",
+    PBNFile.VECTOR_OUTPUT: "pbn-vector_canvas.svg",
+    PBNFile.RASTER_OUTPUT: "pbn-raster_canvas.png",
+    PBNFile.QUANTIZED_GUIDE: "pbn-guide_ncolor_quantized.png",
+    PBNFile.PALETTE_LEGEND: "pbn-palette_legend.png",
     PBNFile.FILTERED_INPUT: "input-filtered.png",
     PBNFile.BPP_QUANTIZED_INPUT: "input-bpp_quantized.png",
-    PBNFile.BPP_QUANTIZED_PALETTE_INPUT: "input_palette-bpp_quantized.png",
+    PBNFile.BPP_QUANTIZED_PALETTE_INPUT: "input-palette_bpp_quantized.png",
     PBNFile.CANVAS_SCALED_INPUT: "input-canvas_scaled.png",
 }
 
