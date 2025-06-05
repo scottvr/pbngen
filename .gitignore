@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv
+.venv-win
+.venv-wsl
+out
 # C extensions
 *.so
 
