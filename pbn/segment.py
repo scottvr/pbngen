@@ -365,12 +365,15 @@ def render_raster_from_primitives(
     font_path_str = str(font_path) if font_path else None
 
     for region_primitive in primitives:
+        # Draw outlines
         for contour_points_list in region_primitive.get("outline", []):
             if len(contour_points_list) > 1:
-                 draw.line(contour_points_list, fill=outline_render_color_rgb, width=1)
+                 # UPDATED LINE: Use draw.polygon to ensure outlines are closed.
+                 draw.polygon(contour_points_list, outline=outline_render_color_rgb)
             elif contour_points_list:
                  draw.point(contour_points_list[0], fill=outline_render_color_rgb)
 
+        # Draw text labels
         for label_data in region_primitive["labels"]:
             default_render_font_size = label_data.get("font_size", 10)
             font_to_use = get_font_for_label(label_data, font_path_str, default_render_font_size)
@@ -597,7 +600,6 @@ def collect_region_primitives(
     image = Image.open(input_path)
     img_data = xp.array(image.convert("RGB"))
     height, width = img_data.shape[:2]
-    # NEW LOGIC: Temporary lists to hold categorized regions
     labeled_regions_data: List[Dict] = []
     unlabeled_regions_to_merge: List[Dict] = []
     
@@ -641,7 +643,6 @@ def collect_region_primitives(
     
     actual_min_filter_area = max(min_region_area, int(dynamic_min_area_for_font))
 
-    # NEW LOGIC: Step 1 - Find all regions and attempt to label them, sorting them into two lists.
     for idx, color_rgb_val in enumerate(palette):
         color_val_on_device = xp.asarray(color_rgb_val, dtype=img_data.dtype)
         mask = xp.all(img_data == color_val_on_device.reshape(1, 1, 3), axis=-1).astype(xp.uint8)
@@ -655,14 +656,13 @@ def collect_region_primitives(
         labeled_array_for_regionprops_np: np.ndarray = xp.asnumpy(labeled_array_on_device) if GPU_ENABLED else labeled_array_on_device
         
         for region_props in regionprops(labeled_array_for_regionprops_np):
-            if region_props.area < min_region_area: continue # Use the user-defined minimum here initially
+            if region_props.area < min_region_area: continue
             if region_props.area > 0.95 * (width * height) : continue
             
             region_mask = (labeled_array_on_device == region_props.label).astype(xp.uint8)
             
             final_labels_for_primitive: List[dict] = []
             
-            # --- Label generation logic (moved from the end of the loop) ---
             if region_props.area >= actual_min_filter_area:
                 local_font_size = font_size if font_size is not None else 10
                 local_spacing_for_diagonal = tile_spacing or max(8, min(region_props.bbox[3] - region_props.bbox[1], region_props.bbox[2] - region_props.bbox[0]) // 4)
@@ -697,7 +697,6 @@ def collect_region_primitives(
                         final_labels_for_primitive.append(label_candidate)
 
                 elif current_label_strategy_for_region == "diagonal":
-                    # ... (diagonal strategy remains the same)
                     temp_diagonal_candidates: List[dict] = []
                     row_is_offset = False
                     for y_coord in range(minr, maxr, local_spacing_for_diagonal):
@@ -712,7 +711,6 @@ def collect_region_primitives(
                         if _check_label_fit_percentage(label_candidate_diag, region_mask, width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
                             final_labels_for_primitive.append(label_candidate_diag)
             
-            # NEW LOGIC: Categorize the region based on whether a label was created.
             region_data = {
                 "mask": region_mask,
                 "area": region_props.area,
@@ -720,7 +718,7 @@ def collect_region_primitives(
                 "palette_index": idx,
                 "region_id": region_id_counter,
                 "labels": final_labels_for_primitive,
-                "merged": False # Flag to track if mask was modified
+                "merged": False
             }
             
             if final_labels_for_primitive:
@@ -730,23 +728,19 @@ def collect_region_primitives(
             
             region_id_counter += 1
     
-    # NEW LOGIC: Step 2 - Merge unlabeled regions into labeled ones
-    # Sort smallest to largest to merge small fragments first
     unlabeled_regions_to_merge.sort(key=lambda r: r['area'])
 
     for small_region in unlabeled_regions_to_merge:
-        dilated_mask = ndi_xp.binary_dilation(small_region['mask'], iterations=2, brute_force=True) # Dilate to find neighbors
+        dilated_mask = ndi_xp.binary_dilation(small_region['mask'], iterations=2, brute_force=True)
         
         potential_merge_targets = []
         for target_region in labeled_regions_data:
-            # Check for overlap between dilated small region and a potential target
             if xp.any(dilated_mask & target_region['mask']):
                 potential_merge_targets.append(target_region)
         
         if not potential_merge_targets:
-            continue # This region is isolated, cannot be merged. It will be dropped.
+            continue
 
-        # --- Find best merge target (prefer same color, then largest area) ---
         best_match_target = None
         same_color_targets = [t for t in potential_merge_targets if t['palette_index'] == small_region['palette_index']]
         
@@ -755,28 +749,19 @@ def collect_region_primitives(
         else:
             best_match_target = max(potential_merge_targets, key=lambda t: t['area'])
 
-        # --- Perform the merge ---
-        # The mask in the list is a reference, so we can update it directly
         best_match_target['mask'] |= small_region['mask']
-        best_match_target['area'] = xp.sum(best_match_target['mask']) # Update area
-        best_match_target['merged'] = True # Mark that this region was changed
+        best_match_target['area'] = xp.sum(best_match_target['mask'])
+        best_match_target['merged'] = True
 
-    # NEW LOGIC: Step 3 - Finalize primitives, recalculating outlines and labels for merged regions
     final_primitives: List[Dict] = []
     for region_data in labeled_regions_data:
-        # If the region was merged into, its outline and label position are now incorrect. Recalculate them.
         if region_data['merged']:
-            # Recalculate stable label position on the new, larger mask
             new_sx, new_sy = find_stable_label_pixel(region_data['mask'])
             
-            # Update the first (and likely only) label's position.
-            # This assumes 'stable' or 'centroid' like strategies where one label per region is the norm.
             if region_data['labels']:
-                # Preserve original font size and value, just update position and area
                 original_label = region_data['labels'][0]
                 region_data['labels'] = [make_label(new_sx, new_sy, region_data['palette_index'], original_label['font_size'], region_data['area'])]
         
-        # --- Generate final outlines for ALL labeled regions ---
         region_mask_for_contours_np = xp.asnumpy(region_data['mask']) if GPU_ENABLED else region_data['mask']
         contours = find_contours(region_mask_for_contours_np, level=0.5)
         if not contours: continue
