@@ -92,7 +92,7 @@ Assuming `OUTPUT_DIRECTORY` is `out/`:
     - `out/input-bpp_quantized_palette.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
     - `out/input-canvas_scaled`: this is the quantized image scaled to output dimensions.
 
- **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.**
+ **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line. Files that exist before a run - even if they are intermediate files and are clobbered with a -y flag, will not be removed by the no-cruft cleaner; only files created anew during a run are cleaned up with this flag. This is for your safety.**
 
 ### Embedded File Metadata
 

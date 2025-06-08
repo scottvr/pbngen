@@ -242,6 +242,9 @@ def pbn_cli(
     except Exception as e:
         typer.secho(f"Error creating output directory {output_dir}: {e}", fg=typer.colors.RED); raise typer.Exit(code=1)
 
+    # UPDATED: Capture initial directory state for safe --no-cruft cleanup
+    initial_files_in_dir = set(os.listdir(output_dir)) if output_dir.exists() else set()
+
     # Use PBNFile enum members for expected_outputs
     expected_outputs: List[PBNFile] = [
         PBNFile.QUANTIZED_GUIDE, PBNFile.RASTER_OUTPUT, PBNFile.PALETTE_LEGEND
@@ -305,7 +308,6 @@ def pbn_cli(
 
     current_input_image_path_for_processing: Path = input_path
     processed_through_filter_chain = False
-    intermediate_filter_files_to_clean: List[Path] = []
     last_filter_output_pil: Optional[Image.Image] = None
 
 
@@ -325,7 +327,6 @@ def pbn_cli(
             else:
                 # Create a unique name for intermediate filtered files
                 output_path_for_this_filter_step = (output_dir / f"_intermediate_filter_step_{i}_{filter_name.replace('-', '_')}").with_suffix(".png")
-                intermediate_filter_files_to_clean.append(output_path_for_this_filter_step)
 
             typer.echo(f"  Applying filter {i+1}/{len(filter)}: '{filter_name}'...")
             # The input to stylize.apply_filter is always a path for the first filter in a chain,
@@ -694,60 +695,35 @@ def pbn_cli(
     
     typer.secho("\nProcessing complete!", fg=typer.colors.GREEN)
 
+    # UPDATED: --no-cruft logic is now safe, robust, and automatic.
     if no_cruft:
         typer.echo("\n--no-cruft active: Cleaning up intermediate files...")
-        
-        files_to_delete_by_no_cruft: List[Path] = []
-        files_to_delete_by_no_cruft.extend(intermediate_filter_files_to_clean) # Already Path objects
-        
-        # Check PBNFile enum based paths
-        # filtered_path is output_paths[PBNFile.FILTERED_INPUT]
-        if processed_through_filter_chain and filtered_path.exists() and filtered_path != path_to_main_image_for_pbn_quantization:
-            files_to_delete_by_no_cruft.append(filtered_path)
 
-        # bpp_quantized_input_path is output_paths[PBNFile.BPP_QUANTIZED_INPUT]
-        if bpp is not None and bpp_quantized_input_path.exists() and bpp_quantized_input_path != path_to_main_image_for_pbn_quantization:
-            files_to_delete_by_no_cruft.append(bpp_quantized_input_path)
+        # Get the final state of the directory
+        final_files_in_dir = set(os.listdir(output_dir))
+
+        # Determine which files were created during this run
+        created_files = final_files_in_dir - initial_files_in_dir
+
+        # Define which files are considered final outputs and should NOT be deleted
+        final_output_basenames = {
+            PBN_FILE_BASENAMES[key] for key in FINAL_OUTPUT_ENUM_KEYS if key in PBN_FILE_BASENAMES
+        }
+
+        # Determine which of the created files are not final outputs
+        files_to_delete = created_files - final_output_basenames
         
-        # bpp_quantized_palette_path is output_paths[PBNFile.BPP_QUANTIZED_PALETTE_INPUT]
-        if bpp is not None and palette_from and bpp_quantized_palette_path.exists():
-            # Check it's not also the main palette image for PBN quantization if paths could align (unlikely here)
-            if path_to_palette_image_for_extraction != bpp_quantized_palette_path: # This check is implicit in current logic
-                 files_to_delete_by_no_cruft.append(bpp_quantized_palette_path)
-
-
-        # canvas_scaled_input_path is output_paths[PBNFile.CANVAS_SCALED_INPUT]
-        if canvas_size_str and canvas_scaled_input_path.exists() and canvas_scaled_input_path != path_to_main_image_for_pbn_quantization:
-            files_to_delete_by_no_cruft.append(canvas_scaled_input_path)
-        
-        # The main quantized guide (output_paths[PBNFile.QUANTIZED_GUIDE]) is a primary output, not cruft.
-        
-        deleted_any_cruft = False
-        unique_files_to_delete = set(files_to_delete_by_no_cruft) 
-
-        for file_path_to_delete in unique_files_to_delete:
-            if file_path_to_delete and file_path_to_delete.exists(): # Ensure Path object and exists
-                try:
-                    file_path_to_delete.unlink()
-                    typer.echo(f"  Deleted: {file_path_to_delete.name}")
-                    deleted_any_cruft = True
-                except OSError as e:
-                    typer.secho(f"  Error deleting {file_path_to_delete.name}: {e}", fg=typer.colors.RED)
-        
-        if not deleted_any_cruft:
-            # Check if any files *would* have been deleted if they existed
-            potential_cruft_paths = [
-                filtered_path if processed_through_filter_chain else None,
-                bpp_quantized_input_path if bpp is not None else None,
-                bpp_quantized_palette_path if bpp is not None and palette_from else None,
-                canvas_scaled_input_path if canvas_size_str else None
-            ]
-            potential_cruft_paths.extend(intermediate_filter_files_to_clean)
-            initial_cruft_existed = any(p.exists() for p in unique_files_to_delete if p)
-
-            if not initial_cruft_existed and not any(p for p in potential_cruft_paths if p and p.exists()): # Check if any were generated and not final products
-                 typer.echo("  No intermediate byproduct files were found or identified for deletion.")
-
+        if not files_to_delete:
+            typer.echo("  No intermediate byproduct files were found to delete.")
+        else:
+            for filename in sorted(list(files_to_delete)): # Sort for deterministic output
+                file_path_to_delete = output_dir / filename
+                if file_path_to_delete.exists():
+                    try:
+                        file_path_to_delete.unlink()
+                        typer.echo(f"  Deleted: {file_path_to_delete.name}")
+                    except OSError as e:
+                        typer.secho(f"  Error deleting {file_path_to_delete.name}: {e}", fg=typer.colors.RED)
 
     if output_dir: typer.echo(f"Outputs in: {output_dir.resolve()}")
 
