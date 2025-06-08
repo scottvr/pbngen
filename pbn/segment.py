@@ -462,7 +462,7 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
     for small_blob_info in temp_small_blobs:
         if small_blob_info["region_id"] in used_blob_ids: continue
         current_mask_small_blob = small_blob_info["mask"] # Renamed for clarity
-        dilated_mask = ndi_xp.binary_dilation(current_mask_small_blob, iterations=1)
+        dilated_mask = ndi_xp.binary_dilation(current_mask_small_blob, iterations=1, brute_force=True)
         best_match_target = None
         potential_merge_targets = []
         # Iterate over a combined list of already kept large blobs and other small, unused blobs
