@@ -201,8 +201,8 @@ def pbn_cli(
         help="Minimum font size for labels when iterative scaling is applied (stable strategy). Default: 6."
     ),
     enable_stable_font_scaling_cli: bool = typer.Option(
-        False,
-        "--enable-stable-font-scaling",
+        True,
+        "--enable-stable-font-scaling/--no-enable-stable-font-scaling",
         help="Enable iterative font scaling for 'stable' label placement strategy."
     ),
     label_color: Optional[str] = typer.Option(
