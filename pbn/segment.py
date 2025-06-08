@@ -454,7 +454,7 @@ def blobbify_primitives(primitives, img_shape, min_blob_area, max_blob_area, fix
     for small_blob_info in temp_small_blobs:
         if small_blob_info["region_id"] in used_blob_ids: continue
         current_mask_small_blob = small_blob_info["mask"]
-        dilated_mask = ndi_xp.binary_dilation(current_mask_small_blob, iterations=1)
+        dilated_mask = ndi_xp.binary_dilation(current_mask_small_blob, iterations=1, brute_force=True)
         best_match_target = None
         potential_merge_targets = []
         candidate_targets = final_kept_blobs + [
@@ -735,7 +735,7 @@ def collect_region_primitives(
     unlabeled_regions_to_merge.sort(key=lambda r: r['area'])
 
     for small_region in unlabeled_regions_to_merge:
-        dilated_mask = ndi_xp.binary_dilation(small_region['mask'], iterations=2) # Dilate to find neighbors
+        dilated_mask = ndi_xp.binary_dilation(small_region['mask'], iterations=2, brute_force=True) # Dilate to find neighbors
         
         potential_merge_targets = []
         for target_region in labeled_regions_data:
