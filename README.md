@@ -81,15 +81,16 @@ This example:
 Assuming `OUTPUT_DIRECTORY` is `out/`:
 
 - **Final PBN Files:**
-    - `out/pbn_guide-ncolor_quantized.png`: The input image reduced to the final PBN color palette (e.g., 12 colors). This is the image used for segmentation and is a fair representation of what your painting should look like when completed.
-    - `out/raster-pbn_canvas.png`: The main raster (PNG) paint-by-number guide with outlines and numeric labels.
-    - `out/vector-pbn_canvas.svg`: A vector (SVG) version of the above (if not `--raster-only`). This is what you'll want to use if you are sending the image to a print shop for otuput to a large canvas since vector graphics scale without losing fidelity.
-    - `out/palette-pbn_legend.png`: A color swatch legend mapping numbers to the final PBN palette colors (if not `--skip-legend`).
+    - `out/pbn_guide_ncolor_quantized.png`: The input image reduced to the final PBN color palette (e.g., 12 colors). This is the image used for segmentation and is a fair representation of what your painting should look like when completed.
+    - `out/pbn-raster_canvas.png`: The main raster (PNG) paint-by-number guide with outlines and numeric labels.
+    - `out/pbn-vector_canvas.svg`: A vector (SVG) version of the above (if not `--raster-only`). This is what you'll want to use if you are sending the image to a print shop for otuput to a large canvas since vector graphics scale without losing fidelity.
+    - `out/pbn-palette_legend.png`: A color swatch legend mapping numbers to the final PBN palette colors (if not `--skip-legend`).
 
 - **Intermediate Files (may be present in the output directory):**
-    - `out/filtered_input.png`: If a `--filter` is applied.
+    - `out/iinput-filtered.png`: If a `--filter` is applied.
     - `out/input-bpp_quantized.png`: If `--bpp` is used, this is the input image after the initial BPP color reduction.
-    - `out/bpp_quantized_palette_input.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
+    - `out/input-bpp_quantized_palette.png`: If `--bpp` and `--palette-from` are used, this is the palette source image after BPP reduction.
+    - `out/input-canvas_scaled`: this is the quantized image scaled to output dimensions.
 
  **Note: the intermediate files can be automatically cleaned up (deleted) by passing the --no-cruft flag on the command-line.**
 
