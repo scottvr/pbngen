@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<svg xmlns:pbngen="http://www.github.com/scottvr/pbngen/assets/ns/pbngen#" xmlns="http://www.w3.org/2000/svg" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:xlink="http://www.w3.org/1999/xlink" baseProfile="full" height="628px" version="1.1" width="631px">
+  <defs/>
+  <metadata id="pbngenApplicationDataContainer">
+    <pbngen:pbngenMetadata id="pbngenApplicationMetadata">
+      <pbngen:Software>pbngen by Scott VR (https://github.com/scottvr/pbngen)</pbngen:Software>
+      <pbngen:CommandLineInvocation>pbngen.py out\amdg-logo-black.png amd-out-bad -y</pbngen:CommandLineInvocation>
+      <pbngen:PbNgen-FileType>Vector PBN Output</pbngen:PbNgen-FileType>
+      <pbngen:SourceQuantizedGuide>pbn-guide_ncolor_quantized.png</pbngen:SourceQuantizedGuide>
+      <pbngen:PaletteColors>12</pbngen:PaletteColors>
+      <pbngen:LabelStrategy>default</pbngen:LabelStrategy>
+      <pbngen:SmallRegionStrategy>stable</pbngen:SmallRegionStrategy>
+      <pbngen:FontSize>10</pbngen:FontSize>
+    </pbngen:pbngenMetadata>
+  </metadata>
+  <g id="pbn-outlines" style="stroke:#88ddff; fill:none; stroke-width:1px;"/>
+  <g id="pbn-labels" style="fill:#88ddff; text-anchor:middle; alignment-baseline:middle; font-family:'sans-serif', ;"/>
+</svg>
