@@ -48,7 +48,7 @@ This command processes `my_photo.jpg`, saves outputs to the `./pbn_output` direc
 
 [Examples complete with input and output images are available on the Wiki](https://github.com/scottvr/pbngen/wiki)
 
-See [Tips for Best Results](#tips-for-best-results) further down in this README.
+See [Tips for Best Results](#tips-for-best-results) further down in this README. There is also a page on troubleshooting bad results in the [Wiki](https://github.com/scottvr/pbngen/wiki)
 
 ### More Complex Example
 
