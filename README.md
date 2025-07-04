@@ -465,7 +465,7 @@ To get scikit-learn to use these accelerated functions you must wrap your pbngen
 python -m cuml.accel pbngen.py input_file output_dir --your --args -here ...
 ```
 
-See also the wiki article [Paralellizing thebStable Label Locator](https://github.com/scottvr/pbngen/wiki/python-dev-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator) if you a deverly-inclined.
+See also the wiki article [Paralellizing the Stable Label Locator](https://github.com/scottvr/pbngen/wiki/python-dev-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator) if you a deverly-inclined.
 
 ### Running on Google Colab
 
