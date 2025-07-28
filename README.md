@@ -463,7 +463,9 @@ To get scikit-learn to use these accelerated functions you must wrap your pbngen
 
 ``` bash 
 python -m cuml.accel pbngen.py input_file output_dir --your --args -here ...
-``` 
+```
+
+See also the wiki article [Parallelizing the Stable Label Locator](https://github.com/scottvr/pbngen/wiki/python-dev-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator) if you a deverly-inclined.
 
 ### Running on Google Colab
 
@@ -490,9 +492,9 @@ See these links for details:
 
 PbNgen is the work of [scottvr](https://github.com/scottvr) and is a rewrite of some old bash, perl and ImageMagick voodoo I used to use to accomplish mostly the same, albeit without as good a resultant product. PbNgen is still undergoing active development so if you have a feature request or bug report, please let me know via Issues. If you have an ehancement, please send me a PR on Github.
 
-The [stable label ranking algorithm](https://github.com/scottvr/pbngen/wiki/nerd-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator) was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PbNgen albeit in a different interface and without hardware acceleration or the ludicrous configurability of PbNgen. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
+The [stable label ranking algorithm](https://github.com/scottvr/pbngen/wiki/python-dev-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator) was shamelessly ripped from [PBNify](https://pbnify.com), a browser app that accomplishes roughly the same thing as PbNgen albeit in a different interface and without hardware acceleration or the ludicrous configurability of PbNgen. Hat tip to [Daniel Munro](https://github.com/daniel-munro).
 
-The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to [accomplish this](https://github.com/scottvr/pbngen/wiki/Paralellizing-the-Stable-Label-Locator).
+The matrix math that parallelizes the aforementioned stable ranking algorithm calculations making it performant even when running over hundreds of variously-shaped regions of color was developed with the help of [Gemini Alpha 2.5 Pro](https://gemini.google.com/). I would otherwise not have known how to [accomplish this](https://github.com/scottvr/pbngen/wiki/python-dev-topics-%E2%80%90-1.-Paralellizing-the-Stable-Label-Locator).
 
 The [mermaid](https://mermaidchart.com/) charts were generated for me by [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai). Thank ya, boys!
 
