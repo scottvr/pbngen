@@ -7,7 +7,7 @@ import random
 from skimage.segmentation import watershed
 from skimage.feature import peak_local_max
 from typing import Optional, Union, List, Tuple, Dict
-from numba import cuda
+from numba import cuda, jit
 import math
 from pathlib import Path
 
@@ -41,17 +41,50 @@ else:
         ndi_xp = ndi_xp_fallback
         GPU_ENABLED = False
 
-@cuda.jit
-def scan_rows_kernel_for_gpu(matrix_in_gpu, counts_out_gpu, num_cols):
-    row_idx = cuda.grid(1)
-    if row_idx < matrix_in_gpu.shape[0]:
-        if num_cols > 0:
-            counts_out_gpu[row_idx, num_cols - 1] = matrix_in_gpu[row_idx, num_cols - 1]
+def find_stable_label_pixel(region_mask: xp.ndarray) -> tuple[int, int]:
+    h, w = region_mask.shape
+    if xp.sum(region_mask) == 0: return (w // 2, h // 2)
+    
+    def _scan_runs_rowwise_left_to_right(matrix_rows: xp.ndarray) -> xp.ndarray:
+        num_rows, num_cols = matrix_rows.shape
+        counts = xp.zeros_like(matrix_rows, dtype=xp.int32)
+        if num_cols == 0: return counts
+        if GPU_ENABLED and xp.__name__ == 'cupy':
+            matrix_for_kernel = matrix_rows.astype(xp.uint8) if matrix_rows.dtype == bool else matrix_rows
+            threads_per_block = 256
+            blocks_per_grid = (num_rows + (threads_per_block - 1)) // threads_per_block
+            scan_rows_kernel_for_gpu[blocks_per_grid, threads_per_block](matrix_for_kernel, counts, num_cols)
+        else:
+            matrix_int = matrix_rows.astype(int)
+            counts[:, num_cols - 1] = matrix_int[:, num_cols - 1]
             for i in range(num_cols - 2, -1, -1):
-                if matrix_in_gpu[row_idx, i] == 1:
-                    counts_out_gpu[row_idx, i] = counts_out_gpu[row_idx, i + 1] + 1
+                counts[:, i] = (counts[:, i + 1] + 1) * matrix_int[:, i]
+        return counts
+    counts_r = _scan_runs_rowwise_left_to_right(region_mask)
+    counts_l = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(region_mask)))
+    mask_T = region_mask.T
+    counts_d = _scan_runs_rowwise_left_to_right(mask_T).T
+    counts_u = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(mask_T))).T
+    score_val_r = xp.maximum(0, counts_r - 1)
+    score_val_l = xp.maximum(0, counts_l - 1)
+    score_val_d = xp.maximum(0, counts_d - 1)
+    score_val_u = xp.maximum(0, counts_u - 1)
+    scores = score_val_r * score_val_l * score_val_d * score_val_u
+    flat_idx = xp.argmax(scores)
+    best_y_xp, best_x_xp = xp.unravel_index(flat_idx, scores.shape)
+    return (int(best_x_xp.item()), int(best_y_xp.item()))
+
+@cuda.jit(cache=True)
+def scan_rows_kernel_for_gpu(matrix_in_gpu, counts_out_gpu, num_cols):
+    pos = cuda.grid(1)
+    if pos < matrix_in_gpu.shape[0]:
+        if num_cols > 0:
+            counts_out_gpu[pos, num_cols - 1] = matrix_in_gpu[pos, num_cols - 1]
+            for i in range(num_cols - 2, -1, -1):
+                if matrix_in_gpu[pos, i] == 1:
+                    counts_out_gpu[pos, i] = counts_out_gpu[pos, i + 1] + 1
                 else:
-                    counts_out_gpu[row_idx, i] = 0
+                    counts_out_gpu[pos, i] = 0
 
 
 def blobbify_region(region_mask: xp.ndarray, min_blob_area: int, max_blob_area: int) -> list[xp.ndarray]:
@@ -296,37 +329,6 @@ def resolve_label_collisions(
         primitive_data["labels"] = kept_labels_for_this_primitive
     return primitives_list
 
-def find_stable_label_pixel(region_mask: xp.ndarray) -> tuple[int, int]:
-    h, w = region_mask.shape
-    if xp.sum(region_mask) == 0: return (w // 2, h // 2)
-    def _scan_runs_rowwise_left_to_right(matrix_rows: xp.ndarray) -> xp.ndarray:
-        num_rows, num_cols = matrix_rows.shape
-        counts = xp.zeros_like(matrix_rows, dtype=xp.int32)
-        if num_cols == 0: return counts
-        if GPU_ENABLED and xp.__name__ == 'cupy':
-            matrix_for_kernel = matrix_rows.astype(xp.uint8) if matrix_rows.dtype == bool else matrix_rows
-            threads_per_block = 256
-            blocks_per_grid = (num_rows + (threads_per_block - 1)) // threads_per_block
-            scan_rows_kernel_for_gpu[blocks_per_grid, threads_per_block](matrix_for_kernel, counts, num_cols)
-        else:
-            matrix_int = matrix_rows.astype(int)
-            counts[:, num_cols - 1] = matrix_int[:, num_cols - 1]
-            for i in range(num_cols - 2, -1, -1):
-                counts[:, i] = (counts[:, i + 1] + 1) * matrix_int[:, i]
-        return counts
-    counts_r = _scan_runs_rowwise_left_to_right(region_mask)
-    counts_l = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(region_mask)))
-    mask_T = region_mask.T
-    counts_d = _scan_runs_rowwise_left_to_right(mask_T).T
-    counts_u = xp.fliplr(_scan_runs_rowwise_left_to_right(xp.fliplr(mask_T))).T
-    score_val_r = xp.maximum(0, counts_r - 1)
-    score_val_l = xp.maximum(0, counts_l - 1)
-    score_val_d = xp.maximum(0, counts_d - 1)
-    score_val_u = xp.maximum(0, counts_u - 1)
-    scores = score_val_r * score_val_l * score_val_d * score_val_u
-    flat_idx = xp.argmax(scores)
-    best_y_xp, best_x_xp = xp.unravel_index(flat_idx, scores.shape)
-    return (int(best_x_xp.item()), int(best_y_xp.item()))
 
 def interpolate_contour(contour: list[tuple[float,float]], step: float = 0.5) -> list[tuple[float,float]]:
     dense = []
