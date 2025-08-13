@@ -190,7 +190,8 @@ def pbn_cli(
         exists=True, file_okay=True, dir_okay=False, readable=True, resolve_path=True,
     ),
     font_size: Optional[int] = typer.Option(None, "--font-size", min=1, help="Base font size. Default: 10."),
-    label_strategy: Optional[str] = typer.Option(None, "--label-strategy", help="Labeling strategy. (diagonal (\"quincunx\"), centroid, stable). Default: diagonal."),
+    label_strategy: Optional[str] = typer.Option("diagonal", "--label-strategy", help="Labeling strategy. (diagonal (\"quincunx\"), centroid, stable). Default: diagonal."),
+    render_nudge_pixels_up: Optional[int] = typer.Option(0,"--nudge-labels", help="nudge labels vertically by this many pixels offset. (negative for down, positive for up.)"),
     tile_spacing: Optional[int] = typer.Option(None, "--tile-spacing", min=1, help="Label distance for diagonal strategy. Default: 20px."),
     small_region_label_strategy: Optional[str] = typer.Option(
     "stable", "--small-region-strategy",
@@ -578,7 +579,6 @@ def pbn_cli(
     typer.echo(f"Collected {len(primitives)} regions initially.")
     typer.echo(f"Collected {sum(len(p['labels']) for p in primitives)} potential labels before collision resolution.")
 
-    render_nudge_pixels_up = 0 
     font_path_for_collision_str = str(font_path) if font_path else None
     primitives = segment.resolve_label_collisions( # type: ignore
         primitives,
@@ -625,6 +625,7 @@ def pbn_cli(
                 default_font_size=effective_font_size,
                 label_color_str=label_color,
                 outline_color_hex=outline_color_cli,
+                additional_nudge_pixels_up=render_nudge_pixels_up,
                 command_line_invocation=command_line_str,
                 additional_metadata=svg_metadata
             )
