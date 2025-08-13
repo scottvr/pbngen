@@ -110,6 +110,7 @@ def save_pbn_svg(
     font_path_str: Optional[str] = None,
     default_font_size: Optional[int] = 10,
     label_color_str: Optional[str] = "#88ddff", 
+    additional_nudge_pixels_up: float = 0.0,
     outline_color_hex: str = "#88ddff", 
     command_line_invocation: Optional[str] = None,
     additional_metadata: Optional[dict[str, str]] = None
@@ -216,8 +217,9 @@ def save_pbn_svg(
     for item in primitives:
         for label_idx, label in enumerate(item.get("labels", [])):
             x, y = label["position"]
+            y_nudged = y - additional_nudge_pixels_up
             font_size_label = label.get("font_size", default_font_size if default_font_size else 10)
-            label_group.add(dwg.text(str(label["value"]), insert=(int(round(x)), int(round(y))), 
+            label_group.add(dwg.text(str(label["value"]), insert=(int(round(x)), int(round(y_nudged))), 
                                      font_size=f"{font_size_label}px"
                                      ))
     dwg.add(label_group)
