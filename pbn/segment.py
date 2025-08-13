@@ -326,9 +326,16 @@ def resolve_label_collisions(
         for label_obj_in_primitive in primitive_data["labels"]:
             if label_obj_in_primitive.get("id") in final_kept_label_ids:
                 kept_labels_for_this_primitive.append(label_obj_in_primitive)
+
+        # If all labels were removed by the collision check, force the best one back in.
+        # This ensures no region is left without a label.
+        if not kept_labels_for_this_primitive and primitive_data["labels"]:
+            # Find the original label associated with the largest area as the "best" one.
+            best_original_label = sorted(primitive_data["labels"], key=lambda l: l.get('region_area', 0), reverse=True)[0]
+            kept_labels_for_this_primitive.append(best_original_label)
+
         primitive_data["labels"] = kept_labels_for_this_primitive
     return primitives_list
-
 
 def interpolate_contour(contour: list[tuple[float,float]], step: float = 0.5) -> list[tuple[float,float]]:
     dense = []
@@ -370,8 +377,8 @@ def render_raster_from_primitives(
         # Draw outlines
         for contour_points_list in region_primitive.get("outline", []):
             if len(contour_points_list) > 1:
-                 # UPDATED LINE: Use draw.polygon to ensure outlines are closed.
-                 draw.polygon(contour_points_list, outline=outline_render_color_rgb)
+                 # CORRECTED: Use draw.line to prevent diagonal artifacts
+                 draw.line(contour_points_list, fill=outline_render_color_rgb, width=1)
             elif contour_points_list:
                  draw.point(contour_points_list[0], fill=outline_render_color_rgb)
 
@@ -587,7 +594,6 @@ def _check_label_fit_percentage(
             percentage_outside = (1.0 - (pixels_in_bbox_and_region_mask / float(pixels_in_bbox_total))) * 100.0
     return percentage_outside
 
-
 def collect_region_primitives(
         input_path, palette, font_size=None, font_path: Optional[Path] = None,
         tile_spacing=None,
@@ -602,173 +608,119 @@ def collect_region_primitives(
     image = Image.open(input_path)
     img_data = xp.array(image.convert("RGB"))
     height, width = img_data.shape[:2]
-    labeled_regions_data: List[Dict] = []
-    unlabeled_regions_to_merge: List[Dict] = []
-    
+
+    # Step 1: Find all regions and store them with their properties.
+    all_regions = []
     region_id_counter = 0
-    dummy_img_for_bbox_calc = Image.new("L", (1,1))
-    dummy_draw_context = ImageDraw.Draw(dummy_img_for_bbox_calc)
-    
-    font_path_str = str(font_path) if font_path and isinstance(font_path, Path) else None
-
-    base_font_size_for_calc = font_size if font_size is not None else 10
-    representative_text = "8"
-    if palette is not None and len(palette) > 0:
-        max_idx = len(palette) -1
-        if max_idx < 10: representative_text = "8"
-        elif max_idx < 100: representative_text = "88"
-        else: representative_text = "888"
-
-    font_for_measurement = None
-    if font_path_str and os.path.isfile(font_path_str):
-        try: font_for_measurement = ImageFont.truetype(font_path_str, base_font_size_for_calc)
-        except IOError: pass
-    if font_for_measurement is None:
-        try: font_for_measurement = ImageFont.load_default(size=base_font_size_for_calc)
-        except TypeError: font_for_measurement = ImageFont.load_default()
-
-    label_w_est, label_h_est = 0,0
-    try:
-        if hasattr(font_for_measurement, 'getbbox'):
-            text_bbox_m = font_for_measurement.getbbox(representative_text)
-        else:
-            text_bbox_m = dummy_draw_context.textbbox((0,0), representative_text, font=font_for_measurement)
-        label_w_est = text_bbox_m[2] - text_bbox_m[0]
-        label_h_est = text_bbox_m[3] - text_bbox_m[1]
-    except (AttributeError, TypeError):
-        label_w_est = base_font_size_for_calc * 0.6 * len(representative_text)
-        label_h_est = base_font_size_for_calc
-
-    label_w_est = max(1, label_w_est); label_h_est = max(1, label_h_est)
-    dynamic_min_area_for_font = (label_w_est * label_h_est) * 2.5
-    dynamic_min_area_for_font = max(dynamic_min_area_for_font, 25)
-    
-    actual_min_filter_area = max(min_region_area, int(dynamic_min_area_for_font))
-
+    combined_labeled_array = xp.zeros((height, width), dtype=xp.int32)
     for idx, color_rgb_val in enumerate(palette):
         color_val_on_device = xp.asarray(color_rgb_val, dtype=img_data.dtype)
         mask = xp.all(img_data == color_val_on_device.reshape(1, 1, 3), axis=-1).astype(xp.uint8)
         if not xp.any(mask): continue
 
         structure_4conn = xp.array([[0,1,0],[1,1,1],[0,1,0]], dtype=bool)
-        labeled_array_on_device, num_features = ndi_xp.label(mask, structure=structure_4conn)
-
+        labeled_array, num_features = ndi_xp.label(mask, structure=structure_4conn)
         if num_features == 0: continue
         
-        labeled_array_for_regionprops_np: np.ndarray = xp.asnumpy(labeled_array_on_device) if GPU_ENABLED else labeled_array_on_device
-        
-        for region_props in regionprops(labeled_array_for_regionprops_np):
-            if region_props.area < min_region_area: continue
-            if region_props.area > 0.95 * (width * height) : continue
-            
-            region_mask = (labeled_array_on_device == region_props.label).astype(xp.uint8)
-            
-            final_labels_for_primitive: List[dict] = []
-            
-            if region_props.area >= actual_min_filter_area:
-                local_font_size = font_size if font_size is not None else 10
-                local_spacing_for_diagonal = tile_spacing or max(8, min(region_props.bbox[3] - region_props.bbox[1], region_props.bbox[2] - region_props.bbox[0]) // 4)
-                local_spacing_for_diagonal = max(1, local_spacing_for_diagonal)
-
-                minr, minc, maxr, maxc = region_props.bbox
-                use_fallback_strategy = (maxc - minc < local_spacing_for_diagonal or maxr - minr < local_spacing_for_diagonal)
-                current_label_strategy_for_region = small_region_label_strategy if use_fallback_strategy else label_strategy
-
-                if current_label_strategy_for_region == "stable":
-                    sx_local, sy_local = find_stable_label_pixel(region_mask)
-                    label_candidate = make_label(sx_local, sy_local, idx, local_font_size, region_props.area)
-                    
-                    if _check_label_fit_percentage(label_candidate, region_mask, width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
-                        final_labels_for_primitive.append(label_candidate)
-                    elif enable_font_scaling:
-                        best_fit_scaled_label = None
-                        for test_font_size in range(local_font_size - 1, min_font_size_for_scaling - 1, -1):
-                            if test_font_size <= 0: continue
-                            current_label_attempt = label_candidate.copy()
-                            current_label_attempt["font_size"] = test_font_size
-                            if _check_label_fit_percentage(current_label_attempt, region_mask, width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
-                                best_fit_scaled_label = current_label_attempt
-                                break
-                        if best_fit_scaled_label:
-                            final_labels_for_primitive.append(best_fit_scaled_label)
-
-                elif current_label_strategy_for_region == "centroid":
-                    cy_global, cx_global = int(region_props.centroid[0]), int(region_props.centroid[1])
-                    label_candidate = make_label(cx_global, cy_global, idx, local_font_size, region_props.area)
-                    if _check_label_fit_percentage(label_candidate, region_mask, width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
-                        final_labels_for_primitive.append(label_candidate)
-
-                elif current_label_strategy_for_region == "diagonal":
-                    temp_diagonal_candidates: List[dict] = []
-                    row_is_offset = False
-                    for y_coord in range(minr, maxr, local_spacing_for_diagonal):
-                        current_x_offset = local_spacing_for_diagonal // 2 if row_is_offset else 0
-                        for x_base_grid in range(minc, maxc, local_spacing_for_diagonal):
-                            actual_x_coord = x_base_grid + current_x_offset
-                            if not (0 <= actual_x_coord < width and 0 <= y_coord < height): continue
-                            if region_mask[y_coord, actual_x_coord]:
-                                temp_diagonal_candidates.append(make_label(actual_x_coord, y_coord, idx, local_font_size, region_props.area))
-                        row_is_offset = not row_is_offset
-                    for label_candidate_diag in temp_diagonal_candidates:
-                        if _check_label_fit_percentage(label_candidate_diag, region_mask, width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
-                            final_labels_for_primitive.append(label_candidate_diag)
-            
-            region_data = {
-                "mask": region_mask,
-                "area": region_props.area,
-                "color": tuple(int(c) for c in color_rgb_val),
-                "palette_index": idx,
-                "region_id": region_id_counter,
-                "labels": final_labels_for_primitive,
-                "merged": False
-            }
-            
-            if final_labels_for_primitive:
-                labeled_regions_data.append(region_data)
-            else:
-                unlabeled_regions_to_merge.append(region_data)
-            
+        props = regionprops(xp.asnumpy(labeled_array) if GPU_ENABLED else labeled_array)
+        for region_prop in props:
+            region_mask = (labeled_array == region_prop.label).astype(xp.uint8)
+            current_id = region_id_counter
+            all_regions.append({
+                "mask": region_mask, "area": region_prop.area, "color": tuple(int(c) for c in color_rgb_val),
+                "palette_index": idx, "region_id": current_id, "labels": [], "merged_into": None
+            })
+            combined_labeled_array[region_mask.astype(bool)] = current_id
             region_id_counter += 1
-    
-    unlabeled_regions_to_merge.sort(key=lambda r: r['area'])
 
-    for small_region in unlabeled_regions_to_merge:
-        dilated_mask = ndi_xp.binary_dilation(small_region['mask'], iterations=2, brute_force=True)
+    # Step 2: Separate regions into keepers and mergers.
+    keepers = {r['region_id']: r for r in all_regions if r['area'] >= min_region_area}
+    mergers = sorted([r for r in all_regions if r['area'] < min_region_area], key=lambda r: r['area'])
+    all_regions_map = {r['region_id']: r for r in all_regions}
+
+    # Step 3: Attempt to label all "keeper" regions.
+    dummy_img_for_bbox_calc = Image.new("L", (1, 1))
+    dummy_draw_context = ImageDraw.Draw(dummy_img_for_bbox_calc)
+    font_path_str = str(font_path) if font_path else None
+
+    for region_id, region_data in keepers.items():
+        minr, minc, maxr, maxc = regionprops(xp.asnumpy(region_data['mask']) if GPU_ENABLED else region_data['mask'])[0].bbox
+        local_font_size = font_size if font_size is not None else 10
+        local_spacing_for_diagonal = tile_spacing or max(8, min(maxc - minc, maxr - minr) // 4)
+
+        # CORRECTED: This logic now correctly chooses the strategy based on your input.
+        primary_strategy = small_region_label_strategy if (maxc - minc < local_spacing_for_diagonal or maxr - minr < local_spacing_for_diagonal) else label_strategy
         
-        potential_merge_targets = []
-        for target_region in labeled_regions_data:
-            if xp.any(dilated_mask & target_region['mask']):
-                potential_merge_targets.append(target_region)
-        
-        if not potential_merge_targets:
-            continue
+        if primary_strategy == "diagonal":
+            temp_diagonal_candidates = []
+            row_is_offset = False
+            for y_coord in range(minr, maxr, local_spacing_for_diagonal):
+                current_x_offset = local_spacing_for_diagonal // 2 if row_is_offset else 0
+                for x_base_grid in range(minc, maxc, local_spacing_for_diagonal):
+                    actual_x_coord = x_base_grid + current_x_offset
+                    if not (0 <= actual_x_coord < width and 0 <= y_coord < height): continue
+                    if region_data['mask'][y_coord, actual_x_coord]:
+                        temp_diagonal_candidates.append(make_label(actual_x_coord, y_coord, region_data['palette_index'], local_font_size, region_data['area']))
+                row_is_offset = not row_is_offset
+            for label_candidate_diag in temp_diagonal_candidates:
+                if _check_label_fit_percentage(label_candidate_diag, region_data['mask'], width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
+                    region_data['labels'].append(label_candidate_diag)
 
-        best_match_target = None
-        same_color_targets = [t for t in potential_merge_targets if t['palette_index'] == small_region['palette_index']]
-        
-        if same_color_targets:
-            best_match_target = max(same_color_targets, key=lambda t: t['area'])
-        else:
-            best_match_target = max(potential_merge_targets, key=lambda t: t['area'])
-
-        best_match_target['mask'] |= small_region['mask']
-        best_match_target['area'] = xp.sum(best_match_target['mask'])
-        best_match_target['merged'] = True
-
-    final_primitives: List[Dict] = []
-    for region_data in labeled_regions_data:
-        if region_data['merged']:
-            new_sx, new_sy = find_stable_label_pixel(region_data['mask'])
+        # Fallback for failed strategies or if 'stable' was chosen initially.
+        if not region_data['labels'] or primary_strategy == "stable":
+            sx, sy = find_stable_label_pixel(region_data['mask'])
+            label_candidate = make_label(sx, sy, region_data['palette_index'], local_font_size, region_data['area'])
             
-            if region_data['labels']:
-                original_label = region_data['labels'][0]
-                region_data['labels'] = [make_label(new_sx, new_sy, region_data['palette_index'], original_label['font_size'], region_data['area'])]
+            if _check_label_fit_percentage(label_candidate, region_data['mask'], width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
+                region_data['labels'].append(label_candidate)
+            elif enable_font_scaling:
+                for test_fs in range(local_font_size - 1, min_font_size_for_scaling - 1, -1):
+                    if test_fs <= 0: continue
+                    scaled_candidate = {**label_candidate, "font_size": test_fs}
+                    if _check_label_fit_percentage(scaled_candidate, region_data['mask'], width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
+                        region_data['labels'].append(scaled_candidate)
+                        break
+    
+    # Step 4: Merge any regions that are still too small or failed to get a label.
+    final_mergers = mergers + [r for r in keepers.values() if not r['labels']]
+    final_mergers = sorted(final_mergers, key=lambda r: r['area'])
+
+    for region_to_merge in final_mergers:
+        if region_to_merge.get('merged_into') is not None: continue
+        dilated_mask = ndi_xp.binary_dilation(region_to_merge['mask'], iterations=1)
         
-        region_mask_for_contours_np = xp.asnumpy(region_data['mask']) if GPU_ENABLED else region_data['mask']
-        contours = find_contours(region_mask_for_contours_np, level=0.5)
+        neighbor_ids_array = xp.unique(combined_labeled_array[dilated_mask.astype(bool)])
+        neighbor_ids = [int(nid) for nid in neighbor_ids_array if int(nid) != region_to_merge['region_id'] and int(nid) in all_regions_map]
+
+        if not neighbor_ids: continue
+        
+        neighbors = [all_regions_map[nid] for nid in neighbor_ids]
+        parent_neighbors = []
+        for neighbor in neighbors:
+            parent = neighbor
+            while parent.get('merged_into') is not None:
+                parent = all_regions_map[parent['merged_into']]
+            parent_neighbors.append(parent)
+
+        if not parent_neighbors: continue
+
+        unique_parents = list({p['region_id']: p for p in parent_neighbors}.values())
+        largest_neighbor = max(unique_parents, key=lambda r: r['area'])
+        
+        largest_neighbor['mask'] |= region_to_merge['mask']
+        largest_neighbor['area'] = xp.sum(largest_neighbor['mask'])
+        region_to_merge['merged_into'] = largest_neighbor['region_id']
+    
+    # Step 5: Finalize primitives for rendering.
+    final_primitives = []
+    for region_id, region_data in keepers.items():
+        if region_data.get('merged_into') is not None: continue
+        if not region_data['labels']: continue
+
+        contours = find_contours(xp.asnumpy(region_data['mask']) if GPU_ENABLED else region_data['mask'], level=0.5)
         if not contours: continue
 
-        outlines: List[List[Tuple[int, int]]] = []
+        outlines = []
         for contour_path_np in contours:
             if contour_path_np.ndim != 2 or contour_path_np.shape[1] != 2: continue
             flipped_path = [(x, y) for y, x in contour_path_np]
@@ -777,13 +729,10 @@ def collect_region_primitives(
             if outline_coords and len(outline_coords) > 1:
                 outlines.append(outline_coords)
         
-        if outlines and region_data['labels']:
+        if outlines:
             final_primitives.append({
-                "outline": outlines,
-                "labels": region_data['labels'],
-                "region_id": region_data['region_id'],
-                "color": region_data['color'],
-                "palette_index": region_data['palette_index'],
+                "outline": outlines, "labels": region_data['labels'], "region_id": region_data['region_id'],
+                "color": region_data['color'], "palette_index": region_data['palette_index']
             })
             
     return final_primitives
