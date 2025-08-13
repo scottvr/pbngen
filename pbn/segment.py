@@ -658,7 +658,6 @@ def collect_region_primitives(
         local_font_size = font_size if font_size is not None else 10
         local_spacing_for_diagonal = tile_spacing or max(8, min(maxc - minc, maxr - minr) // 4)
 
-        # CORRECTED: This logic now correctly chooses the strategy based on your input.
         primary_strategy = small_region_label_strategy if (maxc - minc < local_spacing_for_diagonal or maxr - minr < local_spacing_for_diagonal) else label_strategy
         
         if primary_strategy == "diagonal":
@@ -672,9 +671,17 @@ def collect_region_primitives(
                     if region_data['mask'][y_coord, actual_x_coord]:
                         temp_diagonal_candidates.append(make_label(actual_x_coord, y_coord, region_data['palette_index'], local_font_size, region_data['area']))
                 row_is_offset = not row_is_offset
+
             for label_candidate_diag in temp_diagonal_candidates:
                 if _check_label_fit_percentage(label_candidate_diag, region_data['mask'], width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
                     region_data['labels'].append(label_candidate_diag)
+                elif enable_font_scaling:
+                    for test_fs in range(local_font_size - 1, min_font_size_for_scaling - 1, -1):
+                        if test_fs <= 0: continue
+                        scaled_candidate = {**label_candidate_diag, "font_size": test_fs}
+                        if _check_label_fit_percentage(scaled_candidate, region_data['mask'], width, height, font_path_str, dummy_draw_context, additional_nudge_pixels_up) <= 25.0:
+                            region_data['labels'].append(scaled_candidate)
+                            break # Stop scaling once a fit is found for this candidate point
 
         # Fallback for failed strategies or if 'stable' was chosen initially.
         if not region_data['labels'] or primary_strategy == "stable":
@@ -700,7 +707,12 @@ def collect_region_primitives(
         dilated_mask = ndi_xp.binary_dilation(region_to_merge['mask'], iterations=1)
         
         neighbor_ids_array = xp.unique(combined_labeled_array[dilated_mask.astype(bool)])
-        neighbor_ids = [int(nid) for nid in neighbor_ids_array if int(nid) != region_to_merge['region_id'] and int(nid) in all_regions_map]
+        neighbor_ids = []
+
+        for nid_val in neighbor_ids_array:
+            nid_int = int(nid_val)
+            if nid_int != region_to_merge['region_id'] and nid_int in all_regions_map:
+                neighbor_ids.append(nid_int)
 
         if not neighbor_ids: continue
         
@@ -726,6 +738,12 @@ def collect_region_primitives(
     for region_id, region_data in keepers.items():
         if region_data.get('merged_into') is not None: continue
         if not region_data['labels']: continue
+
+        # If a region grew from merges, its labels might be poorly placed. Re-label it.
+#        if any(r.get('merged_into') == region_id for r in final_mergers):
+#             sx, sy = find_stable_label_pixel(region_data['mask'])
+#             fs = region_data['labels'][0]['font_size'] if region_data['labels'] else local_font_size
+#             region_data['labels'] = [make_label(sx, sy, region_data['palette_index'], fs, region_data['area'])]
 
         contours = find_contours(xp.asnumpy(region_data['mask']) if GPU_ENABLED else region_data['mask'], level=0.5)
         if not contours: continue
