@@ -104,30 +104,29 @@ def save_pbn_png(
 
 
 def save_pbn_svg(
-    output_path: Path, 
+    output_path: Path,
     canvas_size: Tuple[int, int],
     primitives: List[dict],
     font_path_str: Optional[str] = None,
     default_font_size: Optional[int] = 10,
-    label_color_str: Optional[str] = "#88ddff", 
+    label_color_str: Optional[str] = "#88ddff",
+    outline_color_hex: str = "#88ddff",
     additional_nudge_pixels_up: float = 0.0,
-    outline_color_hex: str = "#88ddff", 
     command_line_invocation: Optional[str] = None,
     additional_metadata: Optional[dict[str, str]] = None
 ):
     if not isinstance(output_path, Path):
-        output_path = Path(output_path) 
+        output_path = Path(output_path)
 
     width, height = canvas_size
-    pbngen_ns_uri_for_custom_tags = 'http://www.github.com/scottvr/pbngen/assets/ns/pbngen#' 
+    pbngen_ns_uri_for_custom_tags = 'http://www.github.com/scottvr/pbngen/assets/ns/pbngen#'
     
-    # --- Register namespace with ElementTree for cleaner output ---
     ET.register_namespace('pbngen', pbngen_ns_uri_for_custom_tags)
     
     dwg = svgwrite.Drawing(
-        filename=str(output_path), 
+        filename=str(output_path),
         size=(f"{width}px", f"{height}px"),
-        profile='full' 
+        profile='full'
     )
 
     # --- Font embedding logic ---
@@ -205,14 +204,31 @@ def save_pbn_svg(
     dwg.add(verbatim_metadata_obj)
 
     # --- Drawing primitives ---
-    outline_group = dwg.g(id="pbn-outlines", style=f"stroke:{outline_color_hex}; fill:none; stroke-width:1px;")
-    for item in primitives:
-        for contour_idx, contour in enumerate(item.get("outline", [])):
-            filtered_points = [(max(0, min(int(round(x)), width)), max(0, min(int(round(y)), height))) for x, y in contour]
-            if len(filtered_points) > 1:
-                outline_group.add(dwg.polyline(points=filtered_points))
-    dwg.add(outline_group)
+    use_same_as_color = (outline_color_hex.lower() == 'same-as-fill')
 
+    if use_same_as_color:
+        # Create a group for outlines, but apply styles individually
+        outline_group = dwg.g(id="pbn-outlines", fill="none", stroke_width="1px")
+        for item in primitives:
+            # Convert the region's (R, G, B) color to a hex string for SVG
+            r, g, b = item.get("color", (0, 0, 0))
+            item_stroke_color = f"#{r:02x}{g:02x}{b:02x}"
+            for contour in item.get("outline", []):
+                filtered_points = [(max(0, min(int(round(x)), width)), max(0, min(int(round(y)), height))) for x, y in contour]
+                if len(filtered_points) > 1:
+                    outline_group.add(dwg.polyline(points=filtered_points, stroke=item_stroke_color))
+    else:
+        # Use the original, more efficient method for a single outline color
+        outline_group = dwg.g(id="pbn-outlines", style=f"stroke:{outline_color_hex}; fill:none; stroke-width:1px;")
+        for item in primitives:
+            for contour in item.get("outline", []):
+                filtered_points = [(max(0, min(int(round(x)), width)), max(0, min(int(round(y)), height))) for x, y in contour]
+                if len(filtered_points) > 1:
+                    outline_group.add(dwg.polyline(points=filtered_points))
+    
+    dwg.add(outline_group)
+    
+    font_family_svg = "sans-serif" # Fallback, actual value determined earlier
     label_group = dwg.g(id="pbn-labels", style=f"fill:{label_color_str}; text-anchor:middle; alignment-baseline:middle; font-family:'{font_family_svg}', {'' if font_family_svg == 'sans-serif' else 'sans-serif'};") 
     for item in primitives:
         for label_idx, label in enumerate(item.get("labels", [])):
@@ -229,6 +245,4 @@ def save_pbn_svg(
         dwg.save(pretty=True) 
     except Exception as e:
         print(f"Error saving SVG to {output_path.resolve()}: {e}")
-        print("--- Full Stack Trace Follows ---")
-        traceback.print_exc() # This will print the full stack trace
-        print("---------------------------------")
+        traceback.print_exc() 

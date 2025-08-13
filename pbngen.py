@@ -212,7 +212,7 @@ def pbn_cli(
     outline_color_cli: str = typer.Option(
         "#88ddff",
         "--outline-color",
-        help="Color for PBN outlines in SVG and raster (e.g., '#88ddff' or 'lightblue'). Default: '#88ddff'."
+        help="Color for PBN outlines in SVG and raster (e.g., '#88ddff' or 'lightblue'). Use 'same-as-fill' to outline a region in its palette color.  Default: '#88ddff'."
     ),
     # --- Legend Options ---
     swatch_size: int = typer.Option(40, "--swatch-size", min=10, help="Legend swatch size. Default: 40px."),

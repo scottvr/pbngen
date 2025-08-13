@@ -365,19 +365,28 @@ def render_raster_from_primitives(
     output_img = Image.new("RGB", (width, height), color=(255, 255, 255))
     draw = ImageDraw.Draw(output_img)
 
-    try:
-        outline_render_color_rgb = ImageColor.getrgb(outline_color_str_hex)
-    except ValueError:
-        print(f"Warning: Invalid outline color string '{outline_color_str_hex}' for raster. Defaulting to blue.")
-        outline_render_color_rgb = (102, 204, 255)
+    use_same_as_color = (outline_color_str_hex.lower() == 'same-as-fill')
+    single_outline_color_rgb = None
+    if not use_same_as_color:
+        try:
+            single_outline_color_rgb = ImageColor.getrgb(outline_color_str_hex)
+        except ValueError:
+            print(f"Warning: Invalid outline color string '{outline_color_str_hex}'. Defaulting to blue.")
+            single_outline_color_rgb = (102, 204, 255)
 
     font_path_str = str(font_path) if font_path else None
 
     for region_primitive in primitives:
+        # Determine the correct outline color for this specific region
+        if use_same_as_color:
+            # The 'color' in the primitive is already an (R, G, B) tuple
+            outline_render_color_rgb = region_primitive.get("color", (0, 0, 0))
+        else:
+            outline_render_color_rgb = single_outline_color_rgb
+
         # Draw outlines
         for contour_points_list in region_primitive.get("outline", []):
             if len(contour_points_list) > 1:
-                 # CORRECTED: Use draw.line to prevent diagonal artifacts
                  draw.line(contour_points_list, fill=outline_render_color_rgb, width=1)
             elif contour_points_list:
                  draw.point(contour_points_list[0], fill=outline_render_color_rgb)
@@ -395,6 +404,7 @@ def render_raster_from_primitives(
                 draw.text((float(lx), effective_y_center_for_anchor), text_value,
                           font=font_to_use, fill=label_text_color, anchor="mm")
             except (TypeError, AttributeError, ValueError):
+                # Fallback for older Pillow versions
                 text_width, text_height = 0, 0
                 try:
                     bbox_pil = font_to_use.getbbox(text_value)
