@@ -11,8 +11,8 @@ from numba import cuda, jit
 import math
 from pathlib import Path
 
-_PBNPY_FORCE_NUMPY_ENV = os.environ.get("PBNPY_FORCE_NUMPY", "0").lower()
-FORCE_NUMPY_BACKEND = _PBNPY_FORCE_NUMPY_ENV in ["1", "true", "yes"]
+_PBNGEN_FORCE_NUMPY_ENV = os.environ.get("PBNGEN_FORCE_NUMPY", "0").lower()
+FORCE_NUMPY_BACKEND = _PBNGEN_FORCE_NUMPY_ENV in ["1", "true", "yes"]
 
 if FORCE_NUMPY_BACKEND:
     xp = np

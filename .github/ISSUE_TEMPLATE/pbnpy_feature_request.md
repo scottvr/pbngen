@@ -1,1 +1,1 @@
-Please tell us what PBNPy doesn't do now that you'd like it to!
+Please tell us what PBNGEN doesn't do now that you'd like it to!
